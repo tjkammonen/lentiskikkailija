@@ -88,11 +88,28 @@
 
         <!-- OIKEA PALSTA: Otteluohjelma päivittäin -->
         <div class="lg:col-span-8 bg-white rounded-xl shadow-sm p-4 h-[800px] flex flex-col">
-            <div class="flex justify-between items-center mb-4 pb-2 border-b shrink-0">
-                <h2 class="font-bold text-lg">Otteluohjelma</h2>
-                <button v-if="mode === 'scenario'" @click="clearScenarios" class="text-xs text-red-500 hover:underline">
-                    <i class="fa-solid fa-trash-can"></i> Tyhjennä skenaariot
-                </button>
+            <div class="mb-4 pb-3 border-b shrink-0">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="font-bold text-lg">Otteluohjelma</h2>
+                    <button v-if="mode === 'scenario'" @click="clearScenarios" class="text-xs text-red-500 hover:underline">
+                        <i class="fa-solid fa-trash-can"></i> Tyhjennä skenaariot
+                    </button>
+                </div>
+                
+                <!-- Lohkosuodattimet -->
+                <div class="flex flex-wrap gap-2">
+                    <button @click="activeFilter = 'Kaikki'" 
+                            :class="activeFilter === 'Kaikki' ? 'bg-gray-800 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                            class="px-3 py-1.5 rounded-md text-xs font-bold transition-colors">
+                        Kaikki
+                    </button>
+                    <button v-for="group in ['A', 'B', 'C', 'D']" :key="group"
+                            @click="activeFilter = group"
+                            :class="activeFilter === group ? 'bg-blue-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                            class="px-3 py-1.5 rounded-md text-xs font-bold transition-colors">
+                        Lohko {{ group }}
+                    </button>
+                </div>
             </div>
 
             <!-- Scrollattava ottelulista -->
@@ -138,6 +155,11 @@
                             </div>
                         </div>
                     </div>
+                </div>
+                
+                <!-- Viesti jos mikään ottelu ei osu suodattimeen yhtenä päivänä -->
+                <div v-if="matchesByDate.length === 0" class="text-center text-gray-500 py-8">
+                    Ei otteluita valitulla lohkolla.
                 </div>
             </div>
         </div>
@@ -229,10 +251,11 @@ const { createApp, ref, computed, watch, onMounted } = Vue;
 createApp({
     setup() {
         const mode = ref('scenario');
+        const activeFilter = ref('Kaikki'); // Uusi suodattimen tila
         const openGroups = ref({ A: false, B: false, C: true, D: false });
         const toggleGroup = (group) => openGroups.value[group] = !openGroups.value[group];
 
-        // FlagCDN maakoodit (ISO 3166-1 alpha-2)
+        // FlagCDN maakoodit
         const flags = {
             'Italia': 'it', 'Slovenia': 'si', 'Tšekki': 'cz', 'Kreikka': 'gr', 'Slovakia': 'sk', 'Ruotsi': 'se',
             'Bulgaria': 'bg', 'Puola': 'pl', 'Ukraina': 'ua', 'Portugali': 'pt', 'Israel': 'il', 'Pohjois-Makedonia': 'mk',
@@ -260,9 +283,15 @@ createApp({
             { date: '17.9.', group: 'A', home: 'Slovakia', away: 'Kreikka' }, { date: '17.9.', group: 'A', home: 'Italia', away: 'Slovenia' }, { date: '17.9.', group: 'C', home: 'Serbia', away: 'Belgia' }, { date: '17.9.', group: 'C', home: 'Suomi', away: 'Viro' }
         ].map((m, i) => ({ ...m, id: i + 1 }));
 
+        // SUODATETTU OTTELULISTAUS
         const matchesByDate = computed(() => {
             const grouped = {};
             rawMatches.forEach(m => {
+                // Jos suodatin on päällä eikä ottelun lohko täsmää, ohitetaan ottelu
+                if (activeFilter.value !== 'Kaikki' && m.group !== activeFilter.value) {
+                    return;
+                }
+                
                 if(!grouped[m.date]) grouped[m.date] = [];
                 grouped[m.date].push(m);
             });
@@ -416,7 +445,7 @@ createApp({
         });
 
         return {
-            mode, openGroups, toggleGroup, teams, matchesByDate, flags, getFlagUrl,
+            mode, openGroups, toggleGroup, teams, matchesByDate, flags, getFlagUrl, activeFilter,
             officialResults, scenarioResults, knockout, standings, bracketLayout,
             setResult, removeResult, clearScenarios, clearKnockout, getMatchStyle, setKoWinner
         };
