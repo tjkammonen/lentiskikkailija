@@ -22,7 +22,7 @@
     <header class="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-xl shadow-sm mb-6 border-l-4 border-blue-600">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">EuroVolley 2026 - Skenaariokone</h1>
-            <p class="text-sm text-gray-500">Kaikki lohkot & Pudotuspelien polut</p>
+            <p class="text-sm text-gray-500">Kaikki lohkot & Interaktiiviset pudotuspelipolut</p>
         </div>
         
         <div class="mt-4 md:mt-0 flex items-center bg-gray-100 p-2 rounded-lg">
@@ -164,15 +164,19 @@
         </div>
     </div>
 
-    <!-- POHJA: Pudotuspelipolku -->
+    <!-- POHJA: Pudotuspelipolku (Interaktiivinen) -->
     <div class="bg-gray-800 text-white rounded-xl shadow-lg p-6 border-t-4 border-blue-500">
         <div class="flex justify-between items-end mb-6">
             <div>
                 <h2 class="text-2xl font-bold flex items-center gap-3">
                     Pudotuspelien polut
+                    <span class="bg-blue-600 text-white text-xs px-2 py-1 rounded tracking-wide animate-pulse">INTERAKTIIVINEN</span>
                 </h2>
-                <p class="text-gray-400 text-sm mt-1">Näyttää kaikki mahdolliset joukkueet, jotka voivat edetä kyseiseen otteluun sijoitusten perusteella.</p>
+                <p class="text-gray-400 text-sm mt-1">Näyttää mahdolliset joukkueet. Voit klikata ottelun puoliskoa viedäksesi voittajan eteenpäin.</p>
             </div>
+            <button @click="clearKnockout" class="text-xs text-red-400 hover:text-red-300 bg-gray-700 px-3 py-1.5 rounded transition-colors">
+                <i class="fa-solid fa-rotate-left"></i> Nollaa kaavio
+            </button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 overflow-x-auto pb-4">
@@ -189,31 +193,47 @@
                             <i v-if="match.gold" class="fa-solid fa-trophy text-yellow-500"></i>
                         </div>
                         
-                        <!-- Joukkueiden Pool 1 -->
-                        <div class="p-2 flex flex-wrap gap-1.5 bg-gray-800/50">
-                            <div v-for="team in match.p1" :key="team.seed" 
-                                 class="flex items-center gap-1 bg-gray-800 border border-gray-600 px-1.5 py-0.5 rounded text-[10px]"
-                                 :class="{'border-blue-500 bg-blue-900/30 text-blue-200 font-bold': team.name === 'Suomi'}">
-                                <span class="text-gray-500 mr-0.5 font-mono text-[9px]">{{ team.seed }}</span>
-                                <img v-if="getFlagUrl(team.name)" :src="getFlagUrl(team.name)" class="w-3.5 h-auto inline-block rounded-[1px]" alt="">
-                                <span>{{ team.name || 'TBD' }}</span>
+                        <!-- Joukkueiden Pool 1 (Ylempi) -->
+                        <button @click="setKoWinner(match.id, 1)"
+                                class="p-2 min-h-[38px] transition-all text-left relative focus:outline-none"
+                                :class="[
+                                    knockout[match.id] === 1 ? 'bg-blue-900/40 ring-1 ring-inset ring-blue-500' : 'bg-gray-800/50 hover:bg-gray-600',
+                                    knockout[match.id] === 2 ? 'opacity-30 grayscale' : ''
+                                ]">
+                            <div class="flex flex-wrap gap-1.5 relative z-10 pr-4">
+                                <div v-for="team in match.p1" :key="team.seed" 
+                                     class="flex items-center gap-1 bg-gray-800 border px-1.5 py-0.5 rounded text-[10px] shadow-sm"
+                                     :class="team.name === 'Suomi' ? 'border-blue-400 text-blue-200 font-bold' : 'border-gray-600'">
+                                    <span class="text-gray-500 mr-0.5 font-mono text-[9px]">{{ team.seed }}</span>
+                                    <img v-if="getFlagUrl(team.name)" :src="getFlagUrl(team.name)" class="w-3.5 h-auto inline-block rounded-[1px]" alt="">
+                                    <span>{{ team.name || 'TBD' }}</span>
+                                </div>
                             </div>
-                        </div>
+                            <i v-if="knockout[match.id] === 1" class="fa-solid fa-check absolute right-2 top-1/2 -translate-y-1/2 text-blue-400 opacity-60 text-sm"></i>
+                        </button>
                         
                         <div class="h-[1px] bg-gray-600 w-full relative">
-                            <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[9px] text-gray-500 bg-gray-700 px-1">VS</span>
+                            <span class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[9px] text-gray-400 bg-gray-700 px-1 rounded-sm">VS</span>
                         </div>
                         
-                        <!-- Joukkueiden Pool 2 -->
-                        <div class="p-2 flex flex-wrap gap-1.5 bg-gray-800/50">
-                            <div v-for="team in match.p2" :key="team.seed" 
-                                 class="flex items-center gap-1 bg-gray-800 border border-gray-600 px-1.5 py-0.5 rounded text-[10px]"
-                                 :class="{'border-blue-500 bg-blue-900/30 text-blue-200 font-bold': team.name === 'Suomi'}">
-                                <span class="text-gray-500 mr-0.5 font-mono text-[9px]">{{ team.seed }}</span>
-                                <img v-if="getFlagUrl(team.name)" :src="getFlagUrl(team.name)" class="w-3.5 h-auto inline-block rounded-[1px]" alt="">
-                                <span>{{ team.name || 'TBD' }}</span>
+                        <!-- Joukkueiden Pool 2 (Alempi) -->
+                        <button @click="setKoWinner(match.id, 2)"
+                                class="p-2 min-h-[38px] transition-all text-left relative focus:outline-none"
+                                :class="[
+                                    knockout[match.id] === 2 ? 'bg-blue-900/40 ring-1 ring-inset ring-blue-500' : 'bg-gray-800/50 hover:bg-gray-600',
+                                    knockout[match.id] === 1 ? 'opacity-30 grayscale' : ''
+                                ]">
+                            <div class="flex flex-wrap gap-1.5 relative z-10 pr-4">
+                                <div v-for="team in match.p2" :key="team.seed" 
+                                     class="flex items-center gap-1 bg-gray-800 border px-1.5 py-0.5 rounded text-[10px] shadow-sm"
+                                     :class="team.name === 'Suomi' ? 'border-blue-400 text-blue-200 font-bold' : 'border-gray-600'">
+                                    <span class="text-gray-500 mr-0.5 font-mono text-[9px]">{{ team.seed }}</span>
+                                    <img v-if="getFlagUrl(team.name)" :src="getFlagUrl(team.name)" class="w-3.5 h-auto inline-block rounded-[1px]" alt="">
+                                    <span>{{ team.name || 'TBD' }}</span>
+                                </div>
                             </div>
-                        </div>
+                            <i v-if="knockout[match.id] === 2" class="fa-solid fa-check absolute right-2 top-1/2 -translate-y-1/2 text-blue-400 opacity-60 text-sm"></i>
+                        </button>
 
                     </div>
                 </div>
@@ -281,16 +301,21 @@ createApp({
 
         const officialResults = ref({});
         const scenarioResults = ref({});
+        const knockout = ref({}); // Tallentaa pudotuspelien voittajat
 
         onMounted(() => {
             const savedOfficial = localStorage.getItem('ev26_official');
             const savedScenario = localStorage.getItem('ev26_scenario');
+            const savedKo = localStorage.getItem('ev26_ko_v2'); // Uusi key, ettei sekoitu vanhoihin
+            
             if (savedOfficial) officialResults.value = JSON.parse(savedOfficial);
             if (savedScenario) scenarioResults.value = JSON.parse(savedScenario);
+            if (savedKo) knockout.value = JSON.parse(savedKo);
         });
 
         watch(officialResults, (newVal) => localStorage.setItem('ev26_official', JSON.stringify(newVal)), { deep: true });
         watch(scenarioResults, (newVal) => localStorage.setItem('ev26_scenario', JSON.stringify(newVal)), { deep: true });
+        watch(knockout, (newVal) => localStorage.setItem('ev26_ko_v2', JSON.stringify(newVal)), { deep: true });
 
         const setResult = (matchId, resultString, target) => {
             const [h, a] = resultString.split('-').map(Number);
@@ -308,11 +333,17 @@ createApp({
         };
 
         const clearScenarios = () => { if(confirm('Haluatko varmasti tyhjentää kaikki skenaariot?')) scenarioResults.value = {}; };
+        const clearKnockout = () => { knockout.value = {}; };
 
         const getMatchStyle = (matchId) => {
             if (officialResults.value[matchId]) return 'bg-gray-50 border-gray-200 opacity-90';
             if (mode.value === 'scenario' && scenarioResults.value[matchId]) return 'bg-blue-50/40 border-blue-200';
             return 'bg-white border-gray-100';
+        };
+
+        // Asettaa voittajaksi koko Poolin (1 tai 2)
+        const setKoWinner = (matchId, poolIndex) => {
+            knockout.value[matchId] = knockout.value[matchId] === poolIndex ? null : poolIndex;
         };
 
         const standings = computed(() => {
@@ -349,14 +380,20 @@ createApp({
             return sortedTable;
         });
 
-        // Generoidaan joukkueiden "poolit" eli listat mahdollisista joukkueista
+        // Generoidaan interaktiivinen kaavio (näyttää ja välittää poolit valintojen mukaan)
         const bracketLayout = computed(() => {
             const s = standings.value;
-            // Hakee joukkueen ja palauttaa arrayn
             const getT = (g, i) => [{ name: s[g][i]?.name, seed: `${g}${i+1}` }];
-            const combinePools = (pool1, pool2) => [...pool1, ...pool2];
+            
+            // Palauttaa voittaneen poolin (jos valittu), muuten yhdistää molemmat vaihtoehdoiksi
+            const resolveP = (matchId, p1, p2) => {
+                const w = knockout.value[matchId];
+                if (w === 1) return p1;
+                if (w === 2) return p2;
+                return [...p1, ...p2];
+            };
 
-            // R16 (1 joukkue per puoli)
+            // R16 (1 joukkue per puoli alunperin)
             const r16 = {
                 t1: { p1: getT('A',0), p2: getT('C',3) }, t2: { p1: getT('C',1), p2: getT('A',2) },
                 t3: { p1: getT('A',1), p2: getT('C',2) }, t4: { p1: getT('C',0), p2: getT('A',3) },
@@ -364,23 +401,23 @@ createApp({
                 s3: { p1: getT('B',1), p2: getT('D',2) }, s4: { p1: getT('D',0), p2: getT('B',3) }
             };
 
-            // QF (2 joukkuetta per puoli)
+            // QF 
             const qf = {
-                t1: { p1: combinePools(r16.t1.p1, r16.t1.p2), p2: combinePools(r16.t2.p1, r16.t2.p2) },
-                t2: { p1: combinePools(r16.t3.p1, r16.t3.p2), p2: combinePools(r16.t4.p1, r16.t4.p2) },
-                s1: { p1: combinePools(r16.s1.p1, r16.s1.p2), p2: combinePools(r16.s2.p1, r16.s2.p2) },
-                s2: { p1: combinePools(r16.s3.p1, r16.s3.p2), p2: combinePools(r16.s4.p1, r16.s4.p2) }
+                t1: { p1: resolveP('r16_t1', r16.t1.p1, r16.t1.p2), p2: resolveP('r16_t2', r16.t2.p1, r16.t2.p2) },
+                t2: { p1: resolveP('r16_t3', r16.t3.p1, r16.t3.p2), p2: resolveP('r16_t4', r16.t4.p1, r16.t4.p2) },
+                s1: { p1: resolveP('r16_s1', r16.s1.p1, r16.s1.p2), p2: resolveP('r16_s2', r16.s2.p1, r16.s2.p2) },
+                s2: { p1: resolveP('r16_s3', r16.s3.p1, r16.s3.p2), p2: resolveP('r16_s4', r16.s4.p1, r16.s4.p2) }
             };
 
-            // SF (4 joukkuetta per puoli)
+            // SF 
             const sf = {
-                sf1: { p1: combinePools(qf.t1.p1, qf.t1.p2), p2: combinePools(qf.t2.p1, qf.t2.p2) },
-                sf2: { p1: combinePools(qf.s1.p1, qf.s1.p2), p2: combinePools(qf.s2.p1, qf.s2.p2) }
+                sf1: { p1: resolveP('qf_t1', qf.t1.p1, qf.t1.p2), p2: resolveP('qf_t2', qf.t2.p1, qf.t2.p2) },
+                sf2: { p1: resolveP('qf_s1', qf.s1.p1, qf.s1.p2), p2: resolveP('qf_s2', qf.s2.p1, qf.s2.p2) }
             };
 
-            // FIN (8 joukkuetta per puoli)
+            // FIN
             const fin = {
-                p1: combinePools(sf.sf1.p1, sf.sf1.p2), p2: combinePools(sf.sf2.p1, sf.sf2.p2)
+                p1: resolveP('sf_1', sf.sf1.p1, sf.sf1.p2), p2: resolveP('sf_2', sf.sf2.p1, sf.sf2.p2)
             };
 
             return [
@@ -417,8 +454,8 @@ createApp({
 
         return {
             mode, openGroups, toggleGroup, teams, matchesByDate, flags, getFlagUrl, activeFilter,
-            officialResults, scenarioResults, standings, bracketLayout,
-            setResult, removeResult, clearScenarios, getMatchStyle
+            officialResults, scenarioResults, knockout, standings, bracketLayout,
+            setResult, removeResult, clearScenarios, clearKnockout, getMatchStyle, setKoWinner
         };
     }
 }).mount('#app');
