@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EM-Lentopallo 2026 - Tulospalvelu & Skenaariot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { brand: '#0055A4' } } }
+        }
+    </script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans antialiased p-4 md:p-8">
+
+<div id="app" class="max-w-7xl mx-auto" v-cloak>
+    
+    <!-- Ylätunniste ja Tilanvaihdin -->
+    <header class="flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-xl shadow-sm mb-6 border-l-4 border-blue-600">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">EuroVolley 2026 - Skenaariokone</h1>
+            <p class="text-sm text-gray-500">Kaikki lohkot & Interaktiivinen pudotuspelikaavio</p>
+        </div>
+        
+        <div class="mt-4 md:mt-0 flex items-center bg-gray-100 p-2 rounded-lg">
+            <button @click="mode = 'admin'" 
+                    :class="mode === 'admin' ? 'bg-white shadow-sm font-bold text-red-600' : 'text-gray-500'" 
+                    class="px-4 py-2 rounded-md transition-all text-sm flex items-center gap-2">
+                <i class="fa-solid fa-lock"></i> Kirjaa virallisia
+            </button>
+            <button @click="mode = 'scenario'" 
+                    :class="mode === 'scenario' ? 'bg-white shadow-sm font-bold text-blue-600' : 'text-gray-500'" 
+                    class="px-4 py-2 rounded-md transition-all text-sm flex items-center gap-2">
+                <i class="fa-solid fa-flask"></i> Skenaariotila
+            </button>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+        
+        <!-- VASEN PALSTA: Sarjataulukot (Collapse) -->
+        <div class="lg:col-span-4 flex flex-col gap-4">
+            <div v-for="(groupTeams, groupName) in teams" :key="groupName" class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <button @click="toggleGroup(groupName)" class="w-full bg-gray-800 text-white p-4 flex justify-between items-center hover:bg-gray-700 transition-colors">
+                    <div class="flex items-center gap-3">
+                        <h2 class="font-bold text-lg">Lohko {{ groupName }}</h2>
+                        <span v-if="mode === 'scenario'" class="text-[10px] bg-blue-500 px-2 py-0.5 rounded text-white font-bold uppercase tracking-wider">Skenaariot</span>
+                    </div>
+                    <i class="fa-solid transition-transform duration-300" :class="openGroups[groupName] ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                </button>
+                
+                <div v-show="openGroups[groupName]" class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-500 border-b">
+                            <tr>
+                                <th class="px-3 py-2 w-6">#</th>
+                                <th class="px-2 py-2">Joukkue</th>
+                                <th class="px-1 py-2 text-center" title="Ottelut">O</th>
+                                <th class="px-1 py-2 text-center" title="Voitot">V</th>
+                                <th class="px-1 py-2 text-center font-bold" title="Pisteet">P</th>
+                                <th class="px-2 py-2 text-center" title="Erät">Erät</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(team, index) in standings[groupName]" :key="team.name" 
+                                class="border-b last:border-0"
+                                :class="{'border-l-4 border-l-green-500 bg-green-50/20': index < 4}">
+                                <td class="px-3 py-2 font-bold text-gray-400">{{ index + 1 }}</td>
+                                <td class="px-2 py-2 flex items-center gap-2" :class="{'font-extrabold text-blue-800': team.name === 'Suomi'}">
+                                    {{ getFlag(team.name) }} {{ team.name }}
+                                </td>
+                                <td class="px-1 py-2 text-center">{{ team.matches }}</td>
+                                <td class="px-1 py-2 text-center">{{ team.wins }}</td>
+                                <td class="px-1 py-2 text-center font-bold">{{ team.points }}</td>
+                                <td class="px-2 py-2 text-center text-xs text-gray-500 whitespace-nowrap">
+                                    {{ team.setsWon }}-{{ team.setsLost }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- OIKEA PALSTA: Otteluohjelma päivittäin -->
+        <div class="lg:col-span-8 bg-white rounded-xl shadow-sm p-4 h-[800px] flex flex-col">
+            <div class="flex justify-between items-center mb-4 pb-2 border-b shrink-0">
+                <h2 class="font-bold text-lg">Otteluohjelma</h2>
+                <button v-if="mode === 'scenario'" @click="clearScenarios" class="text-xs text-red-500 hover:underline">
+                    <i class="fa-solid fa-trash-can"></i> Tyhjennä skenaariot
+                </button>
+            </div>
+
+            <!-- Scrollattava ottelulista -->
+            <div class="overflow-y-auto pr-2 space-y-6 flex-1 pb-10">
+                <div v-for="day in matchesByDate" :key="day.date">
+                    <h3 class="font-bold text-gray-700 bg-gray-100 px-3 py-1 rounded-md inline-block mb-3 border-l-2 border-gray-400">
+                        {{ day.date }}
+                    </h3>
+                    <div class="space-y-2 pl-2">
+                        <div v-for="match in day.matches" :key="match.id" class="border rounded-lg p-2.5 flex flex-col md:flex-row justify-between items-center gap-3" :class="getMatchStyle(match.id)">
+                            
+                            <div class="flex items-center w-full md:w-1/2">
+                                <div class="text-xs font-bold text-gray-400 w-8 text-center bg-white border rounded mr-2" title="Lohko">{{ match.group }}</div>
+                                <div class="flex-1 text-right truncate" :class="{'font-extrabold': match.home === 'Suomi'}">
+                                    {{ match.home }} {{ getFlag(match.home) }}
+                                </div>
+                                <div class="px-2 text-gray-300 text-xs">-</div>
+                                <div class="flex-1 truncate" :class="{'font-extrabold': match.away === 'Suomi'}">
+                                    {{ getFlag(match.away) }} {{ match.away }}
+                                </div>
+                            </div>
+
+                            <div class="w-full md:w-1/2 flex justify-end shrink-0">
+                                <div v-if="officialResults[match.id]" class="flex items-center gap-2">
+                                    <span class="font-bold bg-gray-200 px-2 py-0.5 rounded">{{ officialResults[match.id].home }} - {{ officialResults[match.id].away }}</span>
+                                    <i class="fa-solid fa-lock text-gray-400 text-sm"></i>
+                                    <button v-if="mode === 'admin'" @click="removeResult(match.id, 'official')" class="text-red-400 hover:text-red-600 ml-1"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                                <div v-else-if="mode === 'scenario'" class="flex flex-col items-end w-full">
+                                    <div v-if="scenarioResults[match.id]" class="flex items-center gap-2 mb-1">
+                                        <span class="font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded border border-blue-200 italic">{{ scenarioResults[match.id].home }} - {{ scenarioResults[match.id].away }}</span>
+                                        <button @click="removeResult(match.id, 'scenario')" class="text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark"></i></button>
+                                    </div>
+                                    <div class="flex gap-1 flex-wrap justify-end">
+                                        <button v-for="res in ['3-0', '3-1', '3-2', '2-3', '1-3', '0-3']" :key="res" @click="setResult(match.id, res, 'scenario')" class="px-1.5 py-0.5 text-[11px] border rounded hover:bg-blue-50 hover:border-blue-300 transition-colors">{{ res }}</button>
+                                    </div>
+                                </div>
+                                <div v-else-if="mode === 'admin'" class="flex gap-1 flex-wrap justify-end">
+                                    <button v-for="res in ['3-0', '3-1', '3-2', '2-3', '1-3', '0-3']" :key="res" @click="setResult(match.id, res, 'official')" class="px-1.5 py-0.5 text-[11px] border rounded bg-gray-50 hover:bg-red-50 hover:border-red-300 transition-colors">{{ res }}</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- POHJA: Interaktiivinen Pudotuspelikaavio -->
+    <div class="bg-gray-800 text-white rounded-xl shadow-lg p-6 border-t-4 border-blue-500">
+        <div class="flex justify-between items-end mb-6">
+            <div>
+                <h2 class="text-2xl font-bold flex items-center gap-3">
+                    Pudotuspelikaavio 
+                    <span class="bg-blue-600 text-white text-xs px-2 py-1 rounded tracking-wide animate-pulse">INTERAKTIIVINEN</span>
+                </h2>
+                <p class="text-gray-400 text-sm mt-1">Klikkaa ottelun voittajaa viedäksesi joukkueen eteenpäin kaaviossa.</p>
+            </div>
+            <button @click="clearKnockout" class="text-xs text-red-400 hover:text-red-300 bg-gray-700 px-3 py-1.5 rounded">
+                <i class="fa-solid fa-rotate-left"></i> Nollaa kaavio
+            </button>
+        </div>
+
+        <!-- Kaavion sarakkeet -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 overflow-x-auto">
+            
+            <div v-for="(round, roundIdx) in bracketLayout" :key="roundIdx" class="min-w-[240px]">
+                <h3 class="text-center font-bold text-gray-300 mb-4 border-b border-gray-600 pb-2 bg-gray-900/50 rounded py-1">
+                    {{ round.title }}
+                </h3>
+                
+                <div class="space-y-4">
+                    <div v-for="match in round.matches" :key="match.id" 
+                         class="bg-gray-700 border border-gray-600 rounded flex flex-col overflow-hidden shadow-md">
+                        
+                        <div class="text-[10px] bg-gray-900 text-gray-400 px-2 py-1 flex justify-between">
+                            <span>{{ match.label }}</span>
+                            <i v-if="match.gold" class="fa-solid fa-trophy text-yellow-500"></i>
+                        </div>
+                        
+                        <!-- Joukkue 1 Button -->
+                        <button @click="setKoWinner(match.id, 1, match.t1.name)" 
+                                :disabled="!match.t1.name"
+                                class="flex justify-between items-center p-2 transition-colors text-left"
+                                :class="[
+                                    knockout[match.id] === 1 ? 'bg-blue-600 text-white font-bold' : 'hover:bg-gray-600',
+                                    !match.t1.name ? 'opacity-50 cursor-not-allowed' : '',
+                                    match.t1.name === 'Suomi' && knockout[match.id] !== 1 ? 'text-blue-300 font-bold' : ''
+                                ]">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] text-gray-400 w-4">{{ match.t1.seed }}</span>
+                                <span>{{ getFlag(match.t1.name) }} {{ match.t1.name || 'TBD' }}</span>
+                            </div>
+                            <i class="fa-solid fa-check text-sm" v-if="knockout[match.id] === 1"></i>
+                        </button>
+                        
+                        <div class="h-[1px] bg-gray-800 w-full"></div>
+                        
+                        <!-- Joukkue 2 Button -->
+                        <button @click="setKoWinner(match.id, 2, match.t2.name)" 
+                                :disabled="!match.t2.name"
+                                class="flex justify-between items-center p-2 transition-colors text-left"
+                                :class="[
+                                    knockout[match.id] === 2 ? 'bg-blue-600 text-white font-bold' : 'hover:bg-gray-600',
+                                    !match.t2.name ? 'opacity-50 cursor-not-allowed' : '',
+                                    match.t2.name === 'Suomi' && knockout[match.id] !== 2 ? 'text-blue-300 font-bold' : ''
+                                ]">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] text-gray-400 w-4">{{ match.t2.seed }}</span>
+                                <span>{{ getFlag(match.t2.name) }} {{ match.t2.name || 'TBD' }}</span>
+                            </div>
+                            <i class="fa-solid fa-check text-sm" v-if="knockout[match.id] === 2"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+</div>
+
+<style> 
+    [v-cloak] { display: none; } 
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+</style>
+
+<script>
+const { createApp, ref, computed, watch, onMounted } = Vue;
+
+createApp({
+    setup() {
+        const mode = ref('scenario');
+        const openGroups = ref({ A: false, B: false, C: true, D: false });
+        const toggleGroup = (group) => openGroups.value[group] = !openGroups.value[group];
+
+        const flags = {
+            'Italia': '🇮🇹', 'Slovenia': '🇸🇮', 'Tšekki': '🇨🇿', 'Kreikka': '🇬🇷', 'Slovakia': '🇸🇰', 'Ruotsi': '🇸🇪',
+            'Bulgaria': '🇧🇬', 'Puola': '🇵🇱', 'Ukraina': '🇺🇦', 'Portugali': '🇵🇹', 'Israel': '🇮🇱', 'Pohjois-Makedonia': '🇲🇰',
+            'Suomi': '🇫🇮', 'Tanska': '🇩🇰', 'Alankomaat': '🇳🇱', 'Belgia': '🇧🇪', 'Serbia': '🇷🇸', 'Viro': '🇪🇪',
+            'Romania': '🇷🇴', 'Ranska': '🇫🇷', 'Saksa': '🇩🇪', 'Turkki': '🇹🇷', 'Sveitsi': '🇨🇭', 'Latvia': '🇱🇻'
+        };
+        const getFlag = (country) => flags[country] || '🏳️';
+
+        const teams = {
+            A: ['Italia', 'Slovenia', 'Tšekki', 'Kreikka', 'Slovakia', 'Ruotsi'],
+            B: ['Bulgaria', 'Puola', 'Ukraina', 'Portugali', 'Israel', 'Pohjois-Makedonia'],
+            C: ['Suomi', 'Tanska', 'Alankomaat', 'Belgia', 'Serbia', 'Viro'],
+            D: ['Romania', 'Ranska', 'Saksa', 'Turkki', 'Sveitsi', 'Latvia']
+        };
+
+        const rawMatches = [
+            { date: '9.9.', group: 'B', home: 'Bulgaria', away: 'Pohjois-Makedonia' }, { date: '9.9.', group: 'D', home: 'Romania', away: 'Latvia' },
+            { date: '10.9.', group: 'A', home: 'Italia', away: 'Ruotsi' }, { date: '10.9.', group: 'B', home: 'Puola', away: 'Portugali' }, { date: '10.9.', group: 'B', home: 'Israel', away: 'Ukraina' }, { date: '10.9.', group: 'C', home: 'Suomi', away: 'Tanska' }, { date: '10.9.', group: 'D', home: 'Ranska', away: 'Sveitsi' }, { date: '10.9.', group: 'D', home: 'Turkki', away: 'Saksa' },
+            { date: '11.9.', group: 'A', home: 'Tšekki', away: 'Kreikka' }, { date: '11.9.', group: 'A', home: 'Slovakia', away: 'Slovenia' }, { date: '11.9.', group: 'B', home: 'Ukraina', away: 'Pohjois-Makedonia' }, { date: '11.9.', group: 'B', home: 'Portugali', away: 'Bulgaria' }, { date: '11.9.', group: 'C', home: 'Alankomaat', away: 'Belgia' }, { date: '11.9.', group: 'C', home: 'Serbia', away: 'Viro' }, { date: '11.9.', group: 'D', home: 'Saksa', away: 'Latvia' }, { date: '11.9.', group: 'D', home: 'Sveitsi', away: 'Romania' },
+            { date: '12.9.', group: 'A', home: 'Ruotsi', away: 'Tšekki' }, { date: '12.9.', group: 'A', home: 'Kreikka', away: 'Italia' }, { date: '12.9.', group: 'B', home: 'Puola', away: 'Israel' }, { date: '12.9.', group: 'B', home: 'Bulgaria', away: 'Ukraina' }, { date: '12.9.', group: 'C', home: 'Tanska', away: 'Alankomaat' }, { date: '12.9.', group: 'C', home: 'Belgia', away: 'Suomi' }, { date: '12.9.', group: 'D', home: 'Ranska', away: 'Turkki' }, { date: '12.9.', group: 'D', home: 'Romania', away: 'Saksa' },
+            { date: '13.9.', group: 'A', home: 'Slovenia', away: 'Ruotsi' }, { date: '13.9.', group: 'A', home: 'Italia', away: 'Slovakia' }, { date: '13.9.', group: 'B', home: 'Portugali', away: 'Israel' }, { date: '13.9.', group: 'B', home: 'Pohjois-Makedonia', away: 'Puola' }, { date: '13.9.', group: 'C', home: 'Viro', away: 'Tanska' }, { date: '13.9.', group: 'C', home: 'Suomi', away: 'Serbia' }, { date: '13.9.', group: 'D', home: 'Sveitsi', away: 'Turkki' }, { date: '13.9.', group: 'D', home: 'Latvia', away: 'Ranska' },
+            { date: '14.9.', group: 'A', home: 'Slovakia', away: 'Tšekki' }, { date: '14.9.', group: 'A', home: 'Slovenia', away: 'Kreikka' }, { date: '14.9.', group: 'B', home: 'Ukraina', away: 'Portugali' }, { date: '14.9.', group: 'B', home: 'Bulgaria', away: 'Israel' }, { date: '14.9.', group: 'C', home: 'Serbia', away: 'Alankomaat' }, { date: '14.9.', group: 'C', home: 'Viro', away: 'Belgia' }, { date: '14.9.', group: 'D', home: 'Saksa', away: 'Sveitsi' }, { date: '14.9.', group: 'D', home: 'Romania', away: 'Turkki' },
+            { date: '15.9.', group: 'A', home: 'Kreikka', away: 'Ruotsi' }, { date: '15.9.', group: 'A', home: 'Tšekki', away: 'Italia' }, { date: '15.9.', group: 'B', home: 'Pohjois-Makedonia', away: 'Portugali' }, { date: '15.9.', group: 'B', home: 'Puola', away: 'Ukraina' }, { date: '15.9.', group: 'C', home: 'Belgia', away: 'Tanska' }, { date: '15.9.', group: 'C', home: 'Alankomaat', away: 'Suomi' }, { date: '15.9.', group: 'D', home: 'Latvia', away: 'Sveitsi' }, { date: '15.9.', group: 'D', home: 'Ranska', away: 'Saksa' },
+            { date: '16.9.', group: 'A', home: 'Ruotsi', away: 'Slovakia' }, { date: '16.9.', group: 'A', home: 'Tšekki', away: 'Slovenia' }, { date: '16.9.', group: 'B', home: 'Israel', away: 'Pohjois-Makedonia' }, { date: '16.9.', group: 'B', home: 'Puola', away: 'Bulgaria' }, { date: '16.9.', group: 'C', home: 'Tanska', away: 'Serbia' }, { date: '16.9.', group: 'C', home: 'Alankomaat', away: 'Viro' }, { date: '16.9.', group: 'D', home: 'Turkki', away: 'Latvia' }, { date: '16.9.', group: 'D', home: 'Ranska', away: 'Romania' },
+            { date: '17.9.', group: 'A', home: 'Slovakia', away: 'Kreikka' }, { date: '17.9.', group: 'A', home: 'Italia', away: 'Slovenia' }, { date: '17.9.', group: 'C', home: 'Serbia', away: 'Belgia' }, { date: '17.9.', group: 'C', home: 'Suomi', away: 'Viro' }
+        ].map((m, i) => ({ ...m, id: i + 1 }));
+
+        const matchesByDate = computed(() => {
+            const grouped = {};
+            rawMatches.forEach(m => {
+                if(!grouped[m.date]) grouped[m.date] = [];
+                grouped[m.date].push(m);
+            });
+            return Object.keys(grouped).sort((a,b) => parseInt(a) - parseInt(b)).map(date => ({
+                date, matches: grouped[date]
+            }));
+        });
+
+        const officialResults = ref({});
+        const scenarioResults = ref({});
+        const knockout = ref({}); // Tallentaa pudotuspelien voittajat (esim. { 'r16_t1': 1 })
+
+        onMounted(() => {
+            const savedOfficial = localStorage.getItem('ev26_official');
+            const savedScenario = localStorage.getItem('ev26_scenario');
+            const savedKo = localStorage.getItem('ev26_ko');
+            if (savedOfficial) officialResults.value = JSON.parse(savedOfficial);
+            if (savedScenario) scenarioResults.value = JSON.parse(savedScenario);
+            if (savedKo) knockout.value = JSON.parse(savedKo);
+        });
+
+        watch(officialResults, (newVal) => localStorage.setItem('ev26_official', JSON.stringify(newVal)), { deep: true });
+        watch(scenarioResults, (newVal) => localStorage.setItem('ev26_scenario', JSON.stringify(newVal)), { deep: true });
+        watch(knockout, (newVal) => localStorage.setItem('ev26_ko', JSON.stringify(newVal)), { deep: true });
+
+        const setResult = (matchId, resultString, target) => {
+            const [h, a] = resultString.split('-').map(Number);
+            if (target === 'official') {
+                officialResults.value[matchId] = { home: h, away: a };
+                delete scenarioResults.value[matchId];
+            } else {
+                scenarioResults.value[matchId] = { home: h, away: a };
+            }
+        };
+
+        const removeResult = (matchId, target) => {
+            if (target === 'official') delete officialResults.value[matchId];
+            else delete scenarioResults.value[matchId];
+        };
+
+        const clearScenarios = () => {
+            if(confirm('Haluatko varmasti tyhjentää kaikki skenaariot?')) scenarioResults.value = {};
+        };
+        const clearKnockout = () => { knockout.value = {}; };
+
+        const getMatchStyle = (matchId) => {
+            if (officialResults.value[matchId]) return 'bg-gray-50 border-gray-200 opacity-90';
+            if (mode.value === 'scenario' && scenarioResults.value[matchId]) return 'bg-blue-50/40 border-blue-200';
+            return 'bg-white border-gray-100';
+        };
+
+        const setKoWinner = (matchId, teamIndex, teamName) => {
+            if(teamName) {
+                // Toggle logiikka: Jos klikkaat jo valittua, se peruuntuu
+                knockout.value[matchId] = knockout.value[matchId] === teamIndex ? null : teamIndex;
+            }
+        };
+
+        const standings = computed(() => {
+            let table = { A: {}, B: {}, C: {}, D: {} };
+            Object.keys(teams).forEach(group => {
+                teams[group].forEach(t => table[group][t] = { name: t, matches: 0, wins: 0, losses: 0, points: 0, setsWon: 0, setsLost: 0 });
+            });
+            rawMatches.forEach(m => {
+                let res = officialResults.value[m.id];
+                if (mode.value === 'scenario' && !res) res = scenarioResults.value[m.id];
+                if (res) {
+                    table[m.group][m.home].matches++; table[m.group][m.away].matches++;
+                    table[m.group][m.home].setsWon += res.home; table[m.group][m.home].setsLost += res.away;
+                    table[m.group][m.away].setsWon += res.away; table[m.group][m.away].setsLost += res.home;
+                    if (res.home === 3) {
+                        table[m.group][m.home].wins++; table[m.group][m.away].losses++;
+                        res.away === 2 ? (table[m.group][m.home].points += 2, table[m.group][m.away].points += 1) : table[m.group][m.home].points += 3;
+                    } else {
+                        table[m.group][m.away].wins++; table[m.group][m.home].losses++;
+                        res.home === 2 ? (table[m.group][m.away].points += 2, table[m.group][m.home].points += 1) : table[m.group][m.away].points += 3;
+                    }
+                }
+            });
+            let sortedTable = { A: [], B: [], C: [], D: [] };
+            Object.keys(table).forEach(group => {
+                sortedTable[group] = Object.values(table[group]).sort((a, b) => {
+                    if (b.wins !== a.wins) return b.wins - a.wins;
+                    if (b.points !== a.points) return b.points - a.points;
+                    let ratioA = a.setsLost === 0 ? (a.setsWon > 0 ? 999 : 0) : a.setsWon / a.setsLost;
+                    let ratioB = b.setsLost === 0 ? (b.setsWon > 0 ? 999 : 0) : b.setsWon / b.setsLost;
+                    return ratioB - ratioA;
+                });
+            });
+            return sortedTable;
+        });
+
+        // Generoidaan pudotuspelipuu dynaamisesti
+        const bracketLayout = computed(() => {
+            const s = standings.value;
+            const getT = (g, i) => ({ name: s[g][i]?.name, seed: `${g}${i+1}` });
+            
+            // Apufunktio voittajan selvittämiseen edellisestä matsista
+            const resolveW = (matchId, t1Obj, t2Obj) => {
+                const w = knockout.value[matchId];
+                if (w === 1) return t1Obj;
+                if (w === 2) return t2Obj;
+                return { name: '', seed: '' };
+            };
+
+            // R16
+            const r16 = {
+                t1: { t1: getT('A',0), t2: getT('C',3) }, t2: { t1: getT('C',1), t2: getT('A',2) },
+                t3: { t1: getT('A',1), t2: getT('C',2) }, t4: { t1: getT('C',0), t2: getT('A',3) },
+                s1: { t1: getT('B',0), t2: getT('D',3) }, s2: { t1: getT('D',1), t2: getT('B',2) },
+                s3: { t1: getT('B',1), t2: getT('D',2) }, s4: { t1: getT('D',0), t2: getT('B',3) }
+            };
+
+            // QF
+            const qf = {
+                t1: { t1: resolveW('r16_t1', r16.t1.t1, r16.t1.t2), t2: resolveW('r16_t2', r16.t2.t1, r16.t2.t2) },
+                t2: { t1: resolveW('r16_t3', r16.t3.t1, r16.t3.t2), t2: resolveW('r16_t4', r16.t4.t1, r16.t4.t2) },
+                s1: { t1: resolveW('r16_s1', r16.s1.t1, r16.s1.t2), t2: resolveW('r16_s2', r16.s2.t1, r16.s2.t2) },
+                s2: { t1: resolveW('r16_s3', r16.s3.t1, r16.s3.t2), t2: resolveW('r16_s4', r16.s4.t1, r16.s4.t2) }
+            };
+
+            // SF
+            const sf = {
+                sf1: { t1: resolveW('qf_t1', qf.t1.t1, qf.t1.t2), t2: resolveW('qf_t2', qf.t2.t1, qf.t2.t2) }, // Torino haara
+                sf2: { t1: resolveW('qf_s1', qf.s1.t1, qf.s1.t2), t2: resolveW('qf_s2', qf.s2.t1, qf.s2.t2) }  // Sofia haara
+            };
+
+            // Pronssi häviäjistä
+            const bronze_t1 = knockout.value['sf_1'] ? (knockout.value['sf_1'] === 1 ? sf.sf1.t2 : sf.sf1.t1) : {name:''};
+            const bronze_t2 = knockout.value['sf_2'] ? (knockout.value['sf_2'] === 1 ? sf.sf2.t2 : sf.sf2.t1) : {name:''};
+
+            return [
+                {
+                    title: "Neljännesvälierät (19.-21.9.)",
+                    matches: [
+                        { id: 'r16_t1', label: 'Torino 1', ...r16.t1 }, { id: 'r16_t2', label: 'Torino 2', ...r16.t2 },
+                        { id: 'r16_t3', label: 'Torino 3', ...r16.t3 }, { id: 'r16_t4', label: 'Torino 4', ...r16.t4 },
+                        { id: 'r16_s1', label: 'Sofia 1', ...r16.s1 }, { id: 'r16_s2', label: 'Sofia 2', ...r16.s2 },
+                        { id: 'r16_s3', label: 'Sofia 3', ...r16.s3 }, { id: 'r16_s4', label: 'Sofia 4', ...r16.s4 }
+                    ]
+                },
+                {
+                    title: "Puolivälierät (22.-23.9.)",
+                    matches: [
+                        { id: 'qf_t1', label: 'Torino QF 1', ...qf.t1 }, { id: 'qf_t2', label: 'Torino QF 2', ...qf.t2 },
+                        { id: 'qf_s1', label: 'Sofia QF 1', ...qf.s1 }, { id: 'qf_s2', label: 'Sofia QF 2', ...qf.s2 }
+                    ]
+                },
+                {
+                    title: "Välierät (Milano 25.9.)",
+                    matches: [
+                        { id: 'sf_1', label: 'Välierä 1', ...sf.sf1 }, { id: 'sf_2', label: 'Välierä 2', ...sf.sf2 }
+                    ]
+                },
+                {
+                    title: "Mitaliottelut (Milano 26.9.)",
+                    matches: [
+                        { id: 'fin', label: 'EM-Finaali', t1: resolveW('sf_1', sf.sf1.t1, sf.sf1.t2), t2: resolveW('sf_2', sf.sf2.t1, sf.sf2.t2), gold: true },
+                        { id: 'bro', label: 'Pronssiottelu', t1: bronze_t1, t2: bronze_t2 }
+                    ]
+                }
+            ];
+        });
+
+        return {
+            mode, openGroups, toggleGroup, teams, matchesByDate, flags, getFlag,
+            officialResults, scenarioResults, knockout, standings, bracketLayout,
+            setResult, removeResult, clearScenarios, clearKnockout, getMatchStyle, setKoWinner
+        };
+    }
+}).mount('#app');
+</script>
+
+</body>
+</html>
