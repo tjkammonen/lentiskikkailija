@@ -158,7 +158,8 @@
                 </div>
                 
                 <div v-if="matchesByDate.length === 0" class="text-center text-gray-500 py-8">
-                    Ei otteluita valitulla lohkolla.
+                    <span v-if="mode === 'scenario'">Kaikki valitun lohkon pelit on jo pelattu!</span>
+                    <span v-else>Ei otteluita valitulla lohkolla.</span>
                 </div>
             </div>
         </div>
@@ -290,7 +291,12 @@ createApp({
         const matchesByDate = computed(() => {
             const grouped = {};
             rawMatches.forEach(m => {
+                // Suodatin
                 if (activeFilter.value !== 'Kaikki' && m.group !== activeFilter.value) return;
+                
+                // Piilotetaan viralliset tulokset skenaariotilassa
+                if (mode.value === 'scenario' && officialResults.value[m.id]) return;
+
                 if(!grouped[m.date]) grouped[m.date] = [];
                 grouped[m.date].push(m);
             });
@@ -301,12 +307,12 @@ createApp({
 
         const officialResults = ref({});
         const scenarioResults = ref({});
-        const knockout = ref({}); // Tallentaa pudotuspelien voittajat
+        const knockout = ref({}); 
 
         onMounted(() => {
             const savedOfficial = localStorage.getItem('ev26_official');
             const savedScenario = localStorage.getItem('ev26_scenario');
-            const savedKo = localStorage.getItem('ev26_ko_v2'); // Uusi key, ettei sekoitu vanhoihin
+            const savedKo = localStorage.getItem('ev26_ko_v2'); 
             
             if (savedOfficial) officialResults.value = JSON.parse(savedOfficial);
             if (savedScenario) scenarioResults.value = JSON.parse(savedScenario);
@@ -341,7 +347,6 @@ createApp({
             return 'bg-white border-gray-100';
         };
 
-        // Asettaa voittajaksi koko Poolin (1 tai 2)
         const setKoWinner = (matchId, poolIndex) => {
             knockout.value[matchId] = knockout.value[matchId] === poolIndex ? null : poolIndex;
         };
@@ -380,12 +385,10 @@ createApp({
             return sortedTable;
         });
 
-        // Generoidaan interaktiivinen kaavio (näyttää ja välittää poolit valintojen mukaan)
         const bracketLayout = computed(() => {
             const s = standings.value;
             const getT = (g, i) => [{ name: s[g][i]?.name, seed: `${g}${i+1}` }];
             
-            // Palauttaa voittaneen poolin (jos valittu), muuten yhdistää molemmat vaihtoehdoiksi
             const resolveP = (matchId, p1, p2) => {
                 const w = knockout.value[matchId];
                 if (w === 1) return p1;
@@ -393,7 +396,6 @@ createApp({
                 return [...p1, ...p2];
             };
 
-            // R16 (1 joukkue per puoli alunperin)
             const r16 = {
                 t1: { p1: getT('A',0), p2: getT('C',3) }, t2: { p1: getT('C',1), p2: getT('A',2) },
                 t3: { p1: getT('A',1), p2: getT('C',2) }, t4: { p1: getT('C',0), p2: getT('A',3) },
@@ -401,7 +403,6 @@ createApp({
                 s3: { p1: getT('B',1), p2: getT('D',2) }, s4: { p1: getT('D',0), p2: getT('B',3) }
             };
 
-            // QF 
             const qf = {
                 t1: { p1: resolveP('r16_t1', r16.t1.p1, r16.t1.p2), p2: resolveP('r16_t2', r16.t2.p1, r16.t2.p2) },
                 t2: { p1: resolveP('r16_t3', r16.t3.p1, r16.t3.p2), p2: resolveP('r16_t4', r16.t4.p1, r16.t4.p2) },
@@ -409,13 +410,11 @@ createApp({
                 s2: { p1: resolveP('r16_s3', r16.s3.p1, r16.s3.p2), p2: resolveP('r16_s4', r16.s4.p1, r16.s4.p2) }
             };
 
-            // SF 
             const sf = {
                 sf1: { p1: resolveP('qf_t1', qf.t1.p1, qf.t1.p2), p2: resolveP('qf_t2', qf.t2.p1, qf.t2.p2) },
                 sf2: { p1: resolveP('qf_s1', qf.s1.p1, qf.s1.p2), p2: resolveP('qf_s2', qf.s2.p1, qf.s2.p2) }
             };
 
-            // FIN
             const fin = {
                 p1: resolveP('sf_1', sf.sf1.p1, sf.sf1.p2), p2: resolveP('sf_2', sf.sf2.p1, sf.sf2.p2)
             };
