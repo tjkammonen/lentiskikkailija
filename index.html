@@ -70,7 +70,8 @@
                                 :class="{'border-l-4 border-l-green-500 bg-green-50/20': index < 4}">
                                 <td class="px-3 py-2 font-bold text-gray-400">{{ index + 1 }}</td>
                                 <td class="px-2 py-2 flex items-center gap-2" :class="{'font-extrabold text-blue-800': team.name === 'Suomi'}">
-                                    {{ getFlag(team.name) }} {{ team.name }}
+                                    <img v-if="getFlagUrl(team.name)" :src="getFlagUrl(team.name)" class="w-5 h-auto inline-block border border-gray-300 rounded-[2px] shadow-sm" alt="">
+                                    {{ team.name }}
                                 </td>
                                 <td class="px-1 py-2 text-center">{{ team.matches }}</td>
                                 <td class="px-1 py-2 text-center">{{ team.wins }}</td>
@@ -105,12 +106,14 @@
                             
                             <div class="flex items-center w-full md:w-1/2">
                                 <div class="text-xs font-bold text-gray-400 w-8 text-center bg-white border rounded mr-2" title="Lohko">{{ match.group }}</div>
-                                <div class="flex-1 text-right truncate" :class="{'font-extrabold': match.home === 'Suomi'}">
-                                    {{ match.home }} {{ getFlag(match.home) }}
+                                <div class="flex-1 text-right truncate flex items-center justify-end gap-2" :class="{'font-extrabold': match.home === 'Suomi'}">
+                                    {{ match.home }}
+                                    <img v-if="getFlagUrl(match.home)" :src="getFlagUrl(match.home)" class="w-5 h-auto inline-block border border-gray-300 rounded-[2px]" alt="">
                                 </div>
                                 <div class="px-2 text-gray-300 text-xs">-</div>
-                                <div class="flex-1 truncate" :class="{'font-extrabold': match.away === 'Suomi'}">
-                                    {{ getFlag(match.away) }} {{ match.away }}
+                                <div class="flex-1 truncate flex items-center justify-start gap-2" :class="{'font-extrabold': match.away === 'Suomi'}">
+                                    <img v-if="getFlagUrl(match.away)" :src="getFlagUrl(match.away)" class="w-5 h-auto inline-block border border-gray-300 rounded-[2px]" alt="">
+                                    {{ match.away }}
                                 </div>
                             </div>
 
@@ -155,9 +158,7 @@
             </button>
         </div>
 
-        <!-- Kaavion sarakkeet -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 overflow-x-auto">
-            
             <div v-for="(round, roundIdx) in bracketLayout" :key="roundIdx" class="min-w-[240px]">
                 <h3 class="text-center font-bold text-gray-300 mb-4 border-b border-gray-600 pb-2 bg-gray-900/50 rounded py-1">
                     {{ round.title }}
@@ -183,7 +184,8 @@
                                 ]">
                             <div class="flex items-center gap-2">
                                 <span class="text-[10px] text-gray-400 w-4">{{ match.t1.seed }}</span>
-                                <span>{{ getFlag(match.t1.name) }} {{ match.t1.name || 'TBD' }}</span>
+                                <img v-if="getFlagUrl(match.t1.name)" :src="getFlagUrl(match.t1.name)" class="w-4 h-auto inline-block border border-gray-500 rounded-[2px]" alt="">
+                                <span>{{ match.t1.name || 'TBD' }}</span>
                             </div>
                             <i class="fa-solid fa-check text-sm" v-if="knockout[match.id] === 1"></i>
                         </button>
@@ -201,17 +203,16 @@
                                 ]">
                             <div class="flex items-center gap-2">
                                 <span class="text-[10px] text-gray-400 w-4">{{ match.t2.seed }}</span>
-                                <span>{{ getFlag(match.t2.name) }} {{ match.t2.name || 'TBD' }}</span>
+                                <img v-if="getFlagUrl(match.t2.name)" :src="getFlagUrl(match.t2.name)" class="w-4 h-auto inline-block border border-gray-500 rounded-[2px]" alt="">
+                                <span>{{ match.t2.name || 'TBD' }}</span>
                             </div>
                             <i class="fa-solid fa-check text-sm" v-if="knockout[match.id] === 2"></i>
                         </button>
                     </div>
                 </div>
             </div>
-            
         </div>
     </div>
-
 </div>
 
 <style> 
@@ -231,13 +232,14 @@ createApp({
         const openGroups = ref({ A: false, B: false, C: true, D: false });
         const toggleGroup = (group) => openGroups.value[group] = !openGroups.value[group];
 
+        // FlagCDN maakoodit (ISO 3166-1 alpha-2)
         const flags = {
-            'Italia': '🇮🇹', 'Slovenia': '🇸🇮', 'Tšekki': '🇨🇿', 'Kreikka': '🇬🇷', 'Slovakia': '🇸🇰', 'Ruotsi': '🇸🇪',
-            'Bulgaria': '🇧🇬', 'Puola': '🇵🇱', 'Ukraina': '🇺🇦', 'Portugali': '🇵🇹', 'Israel': '🇮🇱', 'Pohjois-Makedonia': '🇲🇰',
-            'Suomi': '🇫🇮', 'Tanska': '🇩🇰', 'Alankomaat': '🇳🇱', 'Belgia': '🇧🇪', 'Serbia': '🇷🇸', 'Viro': '🇪🇪',
-            'Romania': '🇷🇴', 'Ranska': '🇫🇷', 'Saksa': '🇩🇪', 'Turkki': '🇹🇷', 'Sveitsi': '🇨🇭', 'Latvia': '🇱🇻'
+            'Italia': 'it', 'Slovenia': 'si', 'Tšekki': 'cz', 'Kreikka': 'gr', 'Slovakia': 'sk', 'Ruotsi': 'se',
+            'Bulgaria': 'bg', 'Puola': 'pl', 'Ukraina': 'ua', 'Portugali': 'pt', 'Israel': 'il', 'Pohjois-Makedonia': 'mk',
+            'Suomi': 'fi', 'Tanska': 'dk', 'Alankomaat': 'nl', 'Belgia': 'be', 'Serbia': 'rs', 'Viro': 'ee',
+            'Romania': 'ro', 'Ranska': 'fr', 'Saksa': 'de', 'Turkki': 'tr', 'Sveitsi': 'ch', 'Latvia': 'lv'
         };
-        const getFlag = (country) => flags[country] || '🏳️';
+        const getFlagUrl = (country) => flags[country] ? `https://flagcdn.com/w40/${flags[country]}.png` : null;
 
         const teams = {
             A: ['Italia', 'Slovenia', 'Tšekki', 'Kreikka', 'Slovakia', 'Ruotsi'],
@@ -271,7 +273,7 @@ createApp({
 
         const officialResults = ref({});
         const scenarioResults = ref({});
-        const knockout = ref({}); // Tallentaa pudotuspelien voittajat (esim. { 'r16_t1': 1 })
+        const knockout = ref({});
 
         onMounted(() => {
             const savedOfficial = localStorage.getItem('ev26_official');
@@ -301,9 +303,7 @@ createApp({
             else delete scenarioResults.value[matchId];
         };
 
-        const clearScenarios = () => {
-            if(confirm('Haluatko varmasti tyhjentää kaikki skenaariot?')) scenarioResults.value = {};
-        };
+        const clearScenarios = () => { if(confirm('Haluatko varmasti tyhjentää kaikki skenaariot?')) scenarioResults.value = {}; };
         const clearKnockout = () => { knockout.value = {}; };
 
         const getMatchStyle = (matchId) => {
@@ -313,10 +313,7 @@ createApp({
         };
 
         const setKoWinner = (matchId, teamIndex, teamName) => {
-            if(teamName) {
-                // Toggle logiikka: Jos klikkaat jo valittua, se peruuntuu
-                knockout.value[matchId] = knockout.value[matchId] === teamIndex ? null : teamIndex;
-            }
+            if(teamName) knockout.value[matchId] = knockout.value[matchId] === teamIndex ? null : teamIndex;
         };
 
         const standings = computed(() => {
@@ -353,12 +350,9 @@ createApp({
             return sortedTable;
         });
 
-        // Generoidaan pudotuspelipuu dynaamisesti
         const bracketLayout = computed(() => {
             const s = standings.value;
             const getT = (g, i) => ({ name: s[g][i]?.name, seed: `${g}${i+1}` });
-            
-            // Apufunktio voittajan selvittämiseen edellisestä matsista
             const resolveW = (matchId, t1Obj, t2Obj) => {
                 const w = knockout.value[matchId];
                 if (w === 1) return t1Obj;
@@ -366,7 +360,6 @@ createApp({
                 return { name: '', seed: '' };
             };
 
-            // R16
             const r16 = {
                 t1: { t1: getT('A',0), t2: getT('C',3) }, t2: { t1: getT('C',1), t2: getT('A',2) },
                 t3: { t1: getT('A',1), t2: getT('C',2) }, t4: { t1: getT('C',0), t2: getT('A',3) },
@@ -374,7 +367,6 @@ createApp({
                 s3: { t1: getT('B',1), t2: getT('D',2) }, s4: { t1: getT('D',0), t2: getT('B',3) }
             };
 
-            // QF
             const qf = {
                 t1: { t1: resolveW('r16_t1', r16.t1.t1, r16.t1.t2), t2: resolveW('r16_t2', r16.t2.t1, r16.t2.t2) },
                 t2: { t1: resolveW('r16_t3', r16.t3.t1, r16.t3.t2), t2: resolveW('r16_t4', r16.t4.t1, r16.t4.t2) },
@@ -382,13 +374,11 @@ createApp({
                 s2: { t1: resolveW('r16_s3', r16.s3.t1, r16.s3.t2), t2: resolveW('r16_s4', r16.s4.t1, r16.s4.t2) }
             };
 
-            // SF
             const sf = {
-                sf1: { t1: resolveW('qf_t1', qf.t1.t1, qf.t1.t2), t2: resolveW('qf_t2', qf.t2.t1, qf.t2.t2) }, // Torino haara
-                sf2: { t1: resolveW('qf_s1', qf.s1.t1, qf.s1.t2), t2: resolveW('qf_s2', qf.s2.t1, qf.s2.t2) }  // Sofia haara
+                sf1: { t1: resolveW('qf_t1', qf.t1.t1, qf.t1.t2), t2: resolveW('qf_t2', qf.t2.t1, qf.t2.t2) },
+                sf2: { t1: resolveW('qf_s1', qf.s1.t1, qf.s1.t2), t2: resolveW('qf_s2', qf.s2.t1, qf.s2.t2) }
             };
 
-            // Pronssi häviäjistä
             const bronze_t1 = knockout.value['sf_1'] ? (knockout.value['sf_1'] === 1 ? sf.sf1.t2 : sf.sf1.t1) : {name:''};
             const bronze_t2 = knockout.value['sf_2'] ? (knockout.value['sf_2'] === 1 ? sf.sf2.t2 : sf.sf2.t1) : {name:''};
 
@@ -426,7 +416,7 @@ createApp({
         });
 
         return {
-            mode, openGroups, toggleGroup, teams, matchesByDate, flags, getFlag,
+            mode, openGroups, toggleGroup, teams, matchesByDate, flags, getFlagUrl,
             officialResults, scenarioResults, knockout, standings, bracketLayout,
             setResult, removeResult, clearScenarios, clearKnockout, getMatchStyle, setKoWinner
         };
