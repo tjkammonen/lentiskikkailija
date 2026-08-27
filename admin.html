@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EM-Lentopallo 2026 - Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans antialiased p-4">
+
+<div id="app" class="max-w-6xl mx-auto" v-cloak>
+    
+    <!-- Header -->
+    <header class="bg-red-600 p-6 rounded-xl shadow-lg mb-6">
+        <div class="flex items-center gap-3">
+            <i class="fa-solid fa-lock text-3xl"></i>
+            <div>
+                <h1 class="text-2xl font-bold">Admin - Tulosten päivitys</h1>
+                <p class="text-red-200 text-sm">Sisäinen työkalu | Kopioi JSON GitHubiin</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Ohjeet -->
+    <div class="bg-blue-900/50 border border-blue-600 rounded-lg p-4 mb-6">
+        <h3 class="font-bold mb-2 flex items-center gap-2">
+            <i class="fa-solid fa-circle-info"></i> Käyttöohjeet
+        </h3>
+        <ol class="text-sm space-y-1 ml-6 list-decimal text-blue-200">
+            <li>Syötä tulokset alta klikkaamalla tulosta (esim. "3-0")</li>
+            <li>Kopioi JSON-data "Kopioi JSON" -napista</li>
+            <li>Mene GitHubiin ja luo/päivitä tiedosto <code class="bg-black/30 px-1 rounded">results.json</code></li>
+            <li>Liitä JSON sinne ja commitoi</li>
+            <li>Käyttäjät näkevät päivitykset muutaman minuutin sisällä!</li>
+        </ol>
+    </div>
+
+    <!-- Ottelulista päivittäin -->
+    <div class="bg-gray-800 rounded-xl shadow-lg p-6 mb-6">
+        <div class="flex justify-between items-center mb-4 pb-3 border-b border-gray-700">
+            <h2 class="font-bold text-xl">Syötä tulokset</h2>
+            <button @click="clearAll" class="text-xs text-red-400 hover:text-red-300 px-3 py-1 bg-red-900/30 rounded">
+                <i class="fa-solid fa-trash"></i> Tyhjennä kaikki
+            </button>
+        </div>
+
+        <!-- Lohkosuodatin -->
+        <div class="flex gap-2 mb-4">
+            <button @click="filterGroup = 'Kaikki'" 
+                    :class="filterGroup === 'Kaikki' ? 'bg-white text-gray-900' : 'bg-gray-700'"
+                    class="px-3 py-1 rounded text-sm font-bold">
+                Kaikki
+            </button>
+            <button v-for="g in ['A','B','C','D']" :key="g"
+                    @click="filterGroup = g"
+                    :class="filterGroup === g ? 'bg-blue-600 text-white' : 'bg-gray-700'"
+                    class="px-3 py-1 rounded text-sm font-bold">
+                Lohko {{ g }}
+            </button>
+        </div>
+
+        <!-- Ottelut ryhmiteltynä päivittäin -->
+        <div class="space-y-6 max-h-[500px] overflow-y-auto pr-2">
+            <div v-for="day in matchesByDate" :key="day.date">
+                <h3 class="font-bold bg-gray-700 px-3 py-2 rounded mb-2 border-l-4 border-gray-500">
+                    {{ day.date }}
+                </h3>
+                <div class="space-y-2 ml-2">
+                    <div v-for="match in day.matches" :key="match.id" 
+                         class="border rounded-lg p-3 flex justify-between items-center"
+                         :class="results[match.id] ? 'bg-green-900/20 border-green-600' : 'bg-gray-700/50 border-gray-600'">
+                        
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-bold bg-gray-800 px-2 py-1 rounded">{{ match.group }}</span>
+                            <span class="text-sm">{{ match.home }} - {{ match.away }}</span>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <span v-if="results[match.id]" class="font-bold text-green-400 bg-green-900/30 px-3 py-1 rounded border border-green-600">
+                                {{ results[match.id].home }} - {{ results[match.id].away }}
+                            </span>
+                            <button v-if="results[match.id]" @click="removeResult(match.id)" 
+                                    class="text-red-400 hover:text-red-300 px-2">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                            <div v-else class="flex gap-1">
+                                <button v-for="res in ['3-0','3-1','3-2','2-3','1-3','0-3']" :key="res"
+                                        @click="setResult(match.id, res)"
+                                        class="px-2 py-1 text-xs bg-gray-600 hover:bg-blue-600 rounded transition-colors">
+                                    {{ res }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JSON Output -->
+    <div class="bg-gray-800 rounded-xl shadow-lg p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="font-bold text-xl">JSON-data (kopioi GitHubiin)</h2>
+            <div class="flex gap-2">
+                <button @click="downloadJSON" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded font-bold text-sm transition-colors">
+                    <i class="fa-solid fa-download"></i> Lataa tiedosto
+                </button>
+                <button @click="copyJSON" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded font-bold text-sm transition-colors">
+                    <i class="fa-solid fa-copy"></i> {{ copied ? 'Kopioitu!' : 'Kopioi JSON' }}
+                </button>
+            </div>
+        </div>
+        
+        <pre class="bg-black/50 p-4 rounded text-xs overflow-auto max-h-64 border border-gray-700">{{ jsonOutput }}</pre>
+        
+        <p class="text-xs text-gray-400 mt-3">
+            <i class="fa-solid fa-circle-info"></i> 
+            Luo GitHubissa tiedosto <code class="bg-gray-700 px-1 rounded">results.json</code> ja liitä tämä sisältö sinne.
+        </p>
+    </div>
+
+</div>
+
+<style>
+    [v-cloak] { display: none; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #1f2937; }
+    ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+</style>
+
+<script>
+const { createApp, ref, computed, watch, onMounted } = Vue;
+
+createApp({
+    setup() {
+        const results = ref({});
+        const copied = ref(false);
+        const filterGroup = ref('Kaikki');
+
+        const rawMatches = [
+            { date: '9.9.', group: 'B', home: 'Bulgaria', away: 'Pohjois-Makedonia' }, { date: '9.9.', group: 'D', home: 'Romania', away: 'Latvia' },
+            { date: '10.9.', group: 'A', home: 'Italia', away: 'Ruotsi' }, { date: '10.9.', group: 'B', home: 'Puola', away: 'Portugali' }, { date: '10.9.', group: 'B', home: 'Israel', away: 'Ukraina' }, { date: '10.9.', group: 'C', home: 'Suomi', away: 'Tanska' }, { date: '10.9.', group: 'D', home: 'Ranska', away: 'Sveitsi' }, { date: '10.9.', group: 'D', home: 'Turkki', away: 'Saksa' },
+            { date: '11.9.', group: 'A', home: 'Tšekki', away: 'Kreikka' }, { date: '11.9.', group: 'A', home: 'Slovakia', away: 'Slovenia' }, { date: '11.9.', group: 'B', home: 'Ukraina', away: 'Pohjois-Makedonia' }, { date: '11.9.', group: 'B', home: 'Portugali', away: 'Bulgaria' }, { date: '11.9.', group: 'C', home: 'Alankomaat', away: 'Belgia' }, { date: '11.9.', group: 'C', home: 'Serbia', away: 'Viro' }, { date: '11.9.', group: 'D', home: 'Saksa', away: 'Latvia' }, { date: '11.9.', group: 'D', home: 'Sveitsi', away: 'Romania' },
+            { date: '12.9.', group: 'A', home: 'Ruotsi', away: 'Tšekki' }, { date: '12.9.', group: 'A', home: 'Kreikka', away: 'Italia' }, { date: '12.9.', group: 'B', home: 'Puola', away: 'Israel' }, { date: '12.9.', group: 'B', home: 'Bulgaria', away: 'Ukraina' }, { date: '12.9.', group: 'C', home: 'Tanska', away: 'Alankomaat' }, { date: '12.9.', group: 'C', home: 'Belgia', away: 'Suomi' }, { date: '12.9.', group: 'D', home: 'Ranska', away: 'Turkki' }, { date: '12.9.', group: 'D', home: 'Romania', away: 'Saksa' },
+            { date: '13.9.', group: 'A', home: 'Slovenia', away: 'Ruotsi' }, { date: '13.9.', group: 'A', home: 'Italia', away: 'Slovakia' }, { date: '13.9.', group: 'B', home: 'Portugali', away: 'Israel' }, { date: '13.9.', group: 'B', home: 'Pohjois-Makedonia', away: 'Puola' }, { date: '13.9.', group: 'C', home: 'Viro', away: 'Tanska' }, { date: '13.9.', group: 'C', home: 'Suomi', away: 'Serbia' }, { date: '13.9.', group: 'D', home: 'Sveitsi', away: 'Turkki' }, { date: '13.9.', group: 'D', home: 'Latvia', away: 'Ranska' },
+            { date: '14.9.', group: 'A', home: 'Slovakia', away: 'Tšekki' }, { date: '14.9.', group: 'A', home: 'Slovenia', away: 'Kreikka' }, { date: '14.9.', group: 'B', home: 'Ukraina', away: 'Portugali' }, { date: '14.9.', group: 'B', home: 'Bulgaria', away: 'Israel' }, { date: '14.9.', group: 'C', home: 'Serbia', away: 'Alankomaat' }, { date: '14.9.', group: 'C', home: 'Viro', away: 'Belgia' }, { date: '14.9.', group: 'D', home: 'Saksa', away: 'Sveitsi' }, { date: '14.9.', group: 'D', home: 'Romania', away: 'Turkki' },
+            { date: '15.9.', group: 'A', home: 'Kreikka', away: 'Ruotsi' }, { date: '15.9.', group: 'A', home: 'Tšekki', away: 'Italia' }, { date: '15.9.', group: 'B', home: 'Pohjois-Makedonia', away: 'Portugali' }, { date: '15.9.', group: 'B', home: 'Puola', away: 'Ukraina' }, { date: '15.9.', group: 'C', home: 'Belgia', away: 'Tanska' }, { date: '15.9.', group: 'C', home: 'Alankomaat', away: 'Suomi' }, { date: '15.9.', group: 'D', home: 'Latvia', away: 'Sveitsi' }, { date: '15.9.', group: 'D', home: 'Ranska', away: 'Saksa' },
+            { date: '16.9.', group: 'A', home: 'Ruotsi', away: 'Slovakia' }, { date: '16.9.', group: 'A', home: 'Tšekki', away: 'Slovenia' }, { date: '16.9.', group: 'B', home: 'Israel', away: 'Pohjois-Makedonia' }, { date: '16.9.', group: 'B', home: 'Puola', away: 'Bulgaria' }, { date: '16.9.', group: 'C', home: 'Tanska', away: 'Serbia' }, { date: '16.9.', group: 'C', home: 'Alankomaat', away: 'Viro' }, { date: '16.9.', group: 'D', home: 'Turkki', away: 'Latvia' }, { date: '16.9.', group: 'D', home: 'Ranska', away: 'Romania' },
+            { date: '17.9.', group: 'A', home: 'Slovakia', away: 'Kreikka' }, { date: '17.9.', group: 'A', home: 'Italia', away: 'Slovenia' }, { date: '17.9.', group: 'C', home: 'Serbia', away: 'Belgia' }, { date: '17.9.', group: 'C', home: 'Suomi', away: 'Viro' }
+        ].map((m, i) => ({ ...m, id: i + 1 }));
+
+        const matchesByDate = computed(() => {
+            const grouped = {};
+            rawMatches.forEach(m => {
+                if (filterGroup.value !== 'Kaikki' && m.group !== filterGroup.value) return;
+                if (!grouped[m.date]) grouped[m.date] = [];
+                grouped[m.date].push(m);
+            });
+            return Object.keys(grouped).sort((a,b) => parseInt(a) - parseInt(b)).map(date => ({
+                date, matches: grouped[date]
+            }));
+        });
+
+        const setResult = (matchId, resultString) => {
+            const [h, a] = resultString.split('-').map(Number);
+            results.value[matchId] = { home: h, away: a };
+        };
+
+        const removeResult = (matchId) => {
+            delete results.value[matchId];
+        };
+
+        const clearAll = () => {
+            if (confirm('Haluatko varmasti tyhjentää kaikki tulokset?')) {
+                results.value = {};
+            }
+        };
+
+        const jsonOutput = computed(() => {
+            return JSON.stringify(results.value, null, 2);
+        });
+
+        const copyJSON = async () => {
+            try {
+                await navigator.clipboard.writeText(jsonOutput.value);
+                copied.value = true;
+                setTimeout(() => copied.value = false, 2000);
+            } catch (err) {
+                alert('Kopiointi epäonnistui. Kopioi manuaalisesti tekstilaatikosta.');
+            }
+        };
+
+        const downloadJSON = () => {
+            const blob = new Blob([jsonOutput.value], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'results.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+
+        // LocalStorage tallennus (admin-sivulla voit jatkaa seuraavalla kerralla)
+        onMounted(() => {
+            const saved = localStorage.getItem('ev26_admin_results');
+            if (saved) results.value = JSON.parse(saved);
+        });
+
+        watch(results, (newVal) => {
+            localStorage.setItem('ev26_admin_results', JSON.stringify(newVal));
+        }, { deep: true });
+
+        return {
+            results, copied, filterGroup, matchesByDate,
+            setResult, removeResult, clearAll, jsonOutput, copyJSON, downloadJSON
+        };
+    }
+}).mount('#app');
+</script>
+
+</body>
+</html>
