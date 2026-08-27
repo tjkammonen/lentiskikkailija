@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lentiskikkailija 2026 - Lentopallon EM - Tulospalvelu & Skenaariot</title>
+    <title>Lentiskikkailija - Lentopallon EM 2026 - Tulospalvelu & Skenaariot</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -52,37 +52,56 @@
                     <i class="fa-solid transition-transform duration-300" :class="openGroups[groupName] ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
                 </button>
                 
-                <div v-show="openGroups[groupName]" class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
-                        <thead class="bg-gray-50 text-gray-500 border-b">
-                            <tr>
-                                <th class="px-3 py-2 w-6">#</th>
-                                <th class="px-2 py-2">Joukkue</th>
-                                <th class="px-1 py-2 text-center" title="Ottelut">O</th>
-                                <th class="px-1 py-2 text-center" title="Voitot">V</th>
-                                <th class="px-1 py-2 text-center font-bold" title="Pisteet">P</th>
-                                <th class="px-2 py-2 text-center" title="Erät">Erät</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="(team, index) in standings[groupName]" :key="team.name" 
-                                class="border-b last:border-0 cursor-pointer hover:bg-blue-50 transition-colors"
-                                :class="{'border-l-4 border-l-green-500 bg-green-50/20': index < 4}"
-                                @click="selectedTeamForAnalysis = team.name; selectedGroupForAnalysis = groupName">
-                                <td class="px-3 py-2 font-bold text-gray-400">{{ index + 1 }}</td>
-                                <td class="px-2 py-2 flex items-center gap-2" :class="{'font-extrabold text-blue-800': team.name === 'Suomi'}">
-                                    <img v-if="getFlagUrl(team.name)" :src="getFlagUrl(team.name)" class="w-5 h-auto inline-block border border-gray-300 rounded-[2px] shadow-sm" alt="">
-                                    {{ team.name }}
-                                </td>
-                                <td class="px-1 py-2 text-center">{{ team.matches }}</td>
-                                <td class="px-1 py-2 text-center">{{ team.wins }}</td>
-                                <td class="px-1 py-2 text-center font-bold">{{ team.points }}</td>
-                                <td class="px-2 py-2 text-center text-xs text-gray-500 whitespace-nowrap">
-                                    {{ team.setsWon }}-{{ team.setsLost }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div v-show="openGroups[groupName]">
+                    <!-- Jatkoon tarvittavat pisteet -->
+                    <div class="bg-blue-50 border-b border-blue-200 px-3 py-2 text-xs">
+                        <span class="text-gray-600">Jatkoon arvioitu min:</span>
+                        <strong class="text-blue-700 ml-1">{{ estimatedQualificationPoints[groupName] }} pistettä</strong>
+                        <span class="text-gray-400 ml-2">(Top 4 jatkoon)</span>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-50 text-gray-500 border-b">
+                                <tr>
+                                    <th class="px-3 py-2 w-6">#</th>
+                                    <th class="px-2 py-2">Joukkue</th>
+                                    <th class="px-1 py-2 text-center" title="Ottelut">O</th>
+                                    <th class="px-1 py-2 text-center" title="Voitot">V</th>
+                                    <th class="px-1 py-2 text-center font-bold" title="Pisteet">P</th>
+                                    <th class="px-1 py-2 text-center font-bold text-purple-600" title="Maksimipisteet">Max P</th>
+                                    <th class="px-2 py-2 text-center" title="Erät">Erät</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(team, index) in standings[groupName]" :key="team.name" 
+                                    class="border-b last:border-0 cursor-pointer hover:bg-blue-50 transition-colors"
+                                    :class="{'border-l-4 border-l-green-500 bg-green-50/20': index < 4}"
+                                    @click="selectedTeamForAnalysis = team.name; selectedGroupForAnalysis = groupName">
+                                    <td class="px-3 py-2 font-bold text-gray-400">{{ index + 1 }}</td>
+                                    <td class="px-2 py-2" :class="{'font-extrabold text-blue-800': team.name === 'Suomi'}">
+                                        <div class="flex items-center gap-2">
+                                            <img v-if="getFlagUrl(team.name)" :src="getFlagUrl(team.name)" class="w-5 h-auto inline-block border border-gray-300 rounded-[2px] shadow-sm" alt="">
+                                            <span>{{ team.name }}</span>
+                                            <span v-if="teamQualificationStatus[groupName][team.name] === 'qualified'" 
+                                                  class="text-[9px] font-bold bg-green-500 text-white px-1 py-0.5 rounded"
+                                                  title="Jatkopaikka varmistunut">Q</span>
+                                            <span v-if="teamQualificationStatus[groupName][team.name] === 'eliminated'" 
+                                                  class="text-[9px] font-bold bg-red-500 text-white px-1 py-0.5 rounded"
+                                                  title="Putoaminen varmistunut">E</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-1 py-2 text-center">{{ team.matches }}</td>
+                                    <td class="px-1 py-2 text-center">{{ team.wins }}</td>
+                                    <td class="px-1 py-2 text-center font-bold">{{ team.points }}</td>
+                                    <td class="px-1 py-2 text-center font-bold text-purple-600">{{ maxPoints[groupName][team.name] }}</td>
+                                    <td class="px-2 py-2 text-center text-xs text-gray-500 whitespace-nowrap">
+                                        {{ team.setsWon }}-{{ team.setsLost }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -245,23 +264,6 @@
                         <span class="font-bold">{{ match.home }} - {{ match.away }}</span>
                     </div>
                     <span class="text-xs bg-purple-500/30 px-2 py-1 rounded">Jäljellä</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tärkeimmät muiden ottelut -->
-        <div v-if="qualificationAnalysis && qualificationAnalysis.importantOtherMatches.length > 0" class="mt-4 bg-white/10 backdrop-blur rounded-lg p-4 border border-white/20">
-            <h3 class="font-bold mb-3 flex items-center gap-2">
-                <i class="fa-solid fa-eye"></i> Seurattavat muiden ottelut
-            </h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <div v-for="match in qualificationAnalysis.importantOtherMatches" :key="match.id" 
-                     class="bg-white/5 rounded p-2 text-sm flex justify-between items-center border border-white/10">
-                    <div class="flex items-center gap-2">
-                        <span class="text-purple-300 text-xs">{{ match.date }}</span>
-                        <span>{{ match.home }} - {{ match.away }}</span>
-                    </div>
-                    <span class="text-xs text-purple-200">{{ match.reason }}</span>
                 </div>
             </div>
         </div>
@@ -509,6 +511,100 @@ createApp({
             return calculateStandings(results);
         });
 
+        // Laske maksimipisteet jokaiselle joukkueelle
+        const maxPoints = computed(() => {
+            const currentResults = mode.value === 'scenario' 
+                ? { ...officialResults.value, ...scenarioResults.value }
+                : officialResults.value;
+
+            let maxP = { A: {}, B: {}, C: {}, D: {} };
+            
+            Object.keys(teams).forEach(group => {
+                teams[group].forEach(team => {
+                    const teamStats = standings.value[group].find(t => t.name === team);
+                    const remainingMatches = rawMatches.filter(m => 
+                        m.group === group && 
+                        !currentResults[m.id] &&
+                        (m.home === team || m.away === team)
+                    );
+                    maxP[group][team] = teamStats.points + (remainingMatches.length * 3);
+                });
+            });
+            
+            return maxP;
+        });
+
+        // Tarkista joukkueiden matemaattinen jatkopaikka/putoaminen
+        const teamQualificationStatus = computed(() => {
+            let status = { A: {}, B: {}, C: {}, D: {} };
+            
+            Object.keys(teams).forEach(group => {
+                const groupStandings = standings.value[group];
+                const maxPointsInGroup = maxPoints.value[group];
+                
+                teams[group].forEach((team, idx) => {
+                    const teamMaxPoints = maxPointsInGroup[team];
+                    
+                    // Tarkista onko varma jatkopaikka (top 4)
+                    // Jos joukkueen maksimipistemäärä on suurempi kuin vähintään kahden muun joukkueen maksimi
+                    const sortedByMax = Object.entries(maxPointsInGroup)
+                        .filter(([t]) => t !== team)
+                        .sort((a, b) => b[1] - a[1]);
+                    
+                    // Jos joukkueen nykyiset pisteet ovat suuremmat kuin 5. ja 6. sijoilla olevien maksimipisteet
+                    const teamCurrentPoints = groupStandings.find(t => t.name === team).points;
+                    const fifthPlaceMaxPoints = sortedByMax[4] ? sortedByMax[4][1] : 0;
+                    
+                    if (teamCurrentPoints > fifthPlaceMaxPoints) {
+                        status[group][team] = 'qualified';
+                    }
+                    // Tarkista onko varma putoaminen
+                    else if (sortedByMax.length >= 4) {
+                        const fourthPlaceMaxPoints = sortedByMax[3][1];
+                        if (teamMaxPoints < fourthPlaceMaxPoints) {
+                            status[group][team] = 'eliminated';
+                        }
+                    }
+                });
+            });
+            
+            return status;
+        });
+
+        // Estimoi jatkoon tarvittavat pisteet (4. sijan minimiarvio)
+        const estimatedQualificationPoints = computed(() => {
+            let estimates = {};
+            
+            Object.keys(teams).forEach(group => {
+                const groupStandings = standings.value[group];
+                
+                // Jos on jo tuloksia, käytä 4. sijan pisteitä tai arviota
+                if (groupStandings[0].matches > 0) {
+                    // Laske keskiarvo nykyisistä top 4 pisteistä
+                    const top4Points = groupStandings.slice(0, 4).map(t => t.points);
+                    const avgTop4 = top4Points.reduce((a, b) => a + b, 0) / 4;
+                    
+                    // Estimoi loppupistemäärä (olettaen että ~40% peleistä pelattu)
+                    const totalMatches = 5; // Jokainen joukkue pelaa 5 peliä
+                    const avgMatchesPlayed = groupStandings.reduce((sum, t) => sum + t.matches, 0) / 6;
+                    const progressRatio = avgMatchesPlayed / totalMatches;
+                    
+                    if (progressRatio > 0.7) {
+                        // Jos >70% peleistä pelattu, käytä 4. sijan nykyistä pistemäärää
+                        estimates[group] = groupStandings[3].points;
+                    } else {
+                        // Muuten ekstrapoloi
+                        estimates[group] = Math.round(avgTop4 / progressRatio * 0.8); // 80% top4 keskiarvosta
+                    }
+                } else {
+                    // Ei tuloksia, käytä oletusarviota
+                    estimates[group] = 7;
+                }
+            });
+            
+            return estimates;
+        });
+
         // JATKOPAIKKA-ANALYYSI
         const qualificationAnalysis = computed(() => {
             if (!selectedTeamForAnalysis.value || !selectedGroupForAnalysis.value) return null;
@@ -516,14 +612,12 @@ createApp({
             const team = selectedTeamForAnalysis.value;
             const group = selectedGroupForAnalysis.value;
 
-            // Etsi joukkueen nykyinen tilanne
             const currentStandings = standings.value[group];
             const teamStats = currentStandings.find(t => t.name === team);
             if (!teamStats) return null;
 
             const currentRank = currentStandings.findIndex(t => t.name === team) + 1;
 
-            // Etsi jäljellä olevat ottelut
             const currentResults = mode.value === 'scenario' 
                 ? { ...officialResults.value, ...scenarioResults.value }
                 : officialResults.value;
@@ -538,7 +632,6 @@ createApp({
                 m.group === group && !currentResults[m.id]
             );
 
-            // Simuloi kaikki mahdolliset skenaariot
             const possibleResults = [
                 { home: 3, away: 0 },
                 { home: 3, away: 1 },
@@ -550,14 +643,12 @@ createApp({
 
             let totalScenarios = 0;
             let scenariosQualified = 0;
-            const maxScenariosToSimulate = 10000; // Rajoita laskentaa
+            const maxScenariosToSimulate = 10000;
 
-            // Jos liikaa skenaarioita, tee otanta
             const totalPossibleScenarios = Math.pow(6, allGroupRemainingMatches.length);
             const shouldSample = totalPossibleScenarios > maxScenariosToSimulate;
             
             if (allGroupRemainingMatches.length === 0) {
-                // Kaikki pelit pelattu
                 return {
                     currentRank,
                     currentPoints: teamStats.points,
@@ -571,12 +662,10 @@ createApp({
                     isMathematicallyEliminated: currentRank > 4,
                     estimatedMinPoints: 0,
                     statusText: currentRank <= 4 ? 'Jatkopaikka varmistunut!' : 'Pudotettu',
-                    criticalMatches: [],
-                    importantOtherMatches: []
+                    criticalMatches: []
                 };
             }
 
-            // Rekursiivinen skenaariosimulaattori
             const simulateScenarios = (matchIndex, testResults, depth = 0) => {
                 if (shouldSample && totalScenarios >= maxScenariosToSimulate) return;
                 
@@ -591,13 +680,11 @@ createApp({
 
                 const match = allGroupRemainingMatches[matchIndex];
                 
-                // Jos otoskoot, ota satunnainen tulos
                 if (shouldSample && depth > 0) {
                     const randomResult = possibleResults[Math.floor(Math.random() * possibleResults.length)];
                     testResults[match.id] = randomResult;
                     simulateScenarios(matchIndex + 1, testResults, depth + 1);
                 } else {
-                    // Kokeile kaikkia tuloksia
                     for (const result of possibleResults) {
                         const newResults = { ...testResults, [match.id]: result };
                         simulateScenarios(matchIndex + 1, newResults, depth + 1);
@@ -611,41 +698,26 @@ createApp({
                 ? Math.round((scenariosQualified / totalScenarios) * 100) 
                 : 0;
 
-            // Laske maksimipistemäärä
-            const maxPoints = teamStats.points + (remainingMatches.length * 3);
-
-            // Etsi muut kriittiset ottelut (joukkueet jotka ovat lähellä top 4)
-            const closeTeams = currentStandings.filter((t, idx) => 
-                t.name !== team && idx >= 2 && idx <= 5
-            ).map(t => t.name);
-
-            const importantOtherMatches = allGroupRemainingMatches
-                .filter(m => m.home !== team && m.away !== team)
-                .filter(m => closeTeams.includes(m.home) || closeTeams.includes(m.away))
-                .slice(0, 6);
+            const teamMaxPoints = maxPoints.value[group][team];
 
             return {
                 currentRank,
                 currentPoints: teamStats.points,
                 currentWins: teamStats.wins,
                 remainingMatches: remainingMatches.length,
-                maxPoints,
+                maxPoints: teamMaxPoints,
                 qualificationChance,
                 scenariosQualified,
                 totalScenarios,
                 isMathematicallyQualified: qualificationChance === 100 && remainingMatches.length > 0,
                 isMathematicallyEliminated: qualificationChance === 0 && remainingMatches.length > 0,
-                estimatedMinPoints: Math.max(6, Math.ceil(teamStats.points + remainingMatches.length * 1.5)),
+                estimatedMinPoints: estimatedQualificationPoints.value[group],
                 statusText: qualificationChance >= 70 
                     ? 'Vahva jatkopaikka' 
                     : qualificationChance >= 30 
                         ? 'Tarvitsee tuloksia' 
                         : 'Vaikea tilanne',
-                criticalMatches: remainingMatches,
-                importantOtherMatches: importantOtherMatches.map(m => ({
-                    ...m,
-                    reason: 'Kilpailija'
-                }))
+                criticalMatches: remainingMatches
             };
         });
 
@@ -719,7 +791,8 @@ createApp({
             mode, openGroups, toggleGroup, teams, matchesByDate, flags, getFlagUrl, activeFilter,
             officialResults, scenarioResults, knockout, standings, bracketLayout,
             setResult, removeResult, clearScenarios, clearKnockout, getMatchStyle, setKoWinner,
-            selectedTeamForAnalysis, selectedGroupForAnalysis, qualificationAnalysis
+            selectedTeamForAnalysis, selectedGroupForAnalysis, qualificationAnalysis,
+            maxPoints, teamQualificationStatus, estimatedQualificationPoints
         };
     }
 }).mount('#app');
