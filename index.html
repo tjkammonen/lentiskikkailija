@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lentiskikkailija - Lentopallon EM 2026 - Tulospalvelu & Skenaariot</title>
+    <title>EM-Lentopallo 2026 - Tulospalvelu & Skenaariot</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -534,46 +534,54 @@ createApp({
             return maxP;
         });
 
-       // Tarkista joukkueiden matemaattinen jatkopaikka/putoaminen
-const teamQualificationStatus = computed(() => {
-    let status = { A: {}, B: {}, C: {}, D: {} };
-    
-    Object.keys(teams).forEach(group => {
-        const groupStandings = standings.value[group];
-        const maxPointsInGroup = maxPoints.value[group];
-        
-        teams[group].forEach((team) => {
-            const teamStats = groupStandings.find(t => t.name === team);
-            const teamMaxPoints = maxPointsInGroup[team];
-            const teamCurrentPoints = teamStats.points;
+        // Tarkista joukkueiden matemaattinen jatkopaikka/putoaminen (PARANNETTU LOGIIKKA)
+        const teamQualificationStatus = computed(() => {
+            let status = { A: {}, B: {}, C: {}, D: {} };
             
-            // ELIMINATED: Laske montako joukkuetta on JO ohittanut tämän joukkueen maksimipistemäärän
-            const teamsAlreadyAboveMax = groupStandings.filter(t => 
-                t.name !== team && t.points > teamMaxPoints
-            ).length;
-            
-            // Jos 4 tai enemmän joukkuetta on jo ohittanut maksimipistemäärän → eliminoitu
-            if (teamsAlreadyAboveMax >= 4) {
-                status[group][team] = 'eliminated';
-                return; // Ei tarvitse tarkistaa qualified-statusta
-            }
-            
-            // QUALIFIED: Laske montako joukkuetta VOI VIELÄ ohittaa tämän joukkueen nykyiset pisteet
-            const otherTeams = groupStandings.filter(t => t.name !== team);
-            const teamsCanStillCatchUp = otherTeams.filter(t => 
-                maxPointsInGroup[t.name] > teamCurrentPoints
-            ).length;
-            
-            // Jos korkeintaan 1 joukkue voi ohittaa → qualified (varmuudella top 4)
-            if (teamsCanStillCatchUp <= 1) {
-                status[group][team] = 'qualified';
-            }
-        });
-    });
-    
-    return status;
-});
-
+            Object.keys(teams).forEach(group => {
+                const groupStandings = standings.value[group];
+                const maxPointsInGroup = maxPoints.value[group];
+                
+                teams[group].forEach((team) => {
+                    const teamStats = groupStandings.find(t => t.name === team);
+                    const teamMaxPoints = maxPointsInGroup[team];
+                    const teamCurrentPoints = teamStats.points;
+                    
+                    // ELIMINATED: Laske montako joukkuetta on JO ohittanut tämän joukkueen maksimipistemäärän
+                    const teamsAlreadyAboveMax = groupStandings.filter(t => 
+                        t.name !== team && t.points > teamMaxPoints
+                    ).length;
+                    
+                    // Jos 4 tai enemmän joukkuetta on jo varmuudella edellä → eliminoitu
+                    if (teamsAlreadyAboveMax >= 4) {
+                        status[group][team] = 'eliminated';
+                        return;
+                    }
+                    
+                    // QUALIFIED: Laske montako joukkuetta VOI VIELÄ ohittaa tämän joukkueen nykyiset pisteet
+                    const otherTeams = groupStandings.filter(t => t.name !== team);
+                    const teamsCanStillCatchUp = otherTeams.filter(t => 
+                        maxPointsInGroup[t.name] > teamCurrentPoints
+                    ).length;
+                    
+                    // Jos korkeintaan 1 joukkue voi ohittaa → qualified (varmuudella top 4)
+                    // TAI jos 2 voi ohittaa MUTTA joukkue on jo voittanut kaikki pelinsä
+                    const remainingMatches = rawMatches.filter(m => {
+                        const currentResults = mode.value === 'scenario' 
+                            ? { ...officialResults.value, ...scenarioResults.value }
+                            : officialResults.value;
+                        return m.group === group && 
+                               !currentResults[m.id] &&
+                               (m.home === team || m.away === team);
+                    }).length;
+                    
+                    if (teamsCanStillCatchUp <= 1) {
+                        status[group][team] = 'qualified';
+                    } else if (teamsCanStillCatchUp === 2 && remainingMatches === 0) {
+                        // Erikoistapaus: jos tämä joukkue on pelannut kaikki pelinsä ja vain 2 voi ohittaa
+                        status[group][team] = 'qualified';
+                    }
+                });
             });
             
             return status;
@@ -586,26 +594,20 @@ const teamQualificationStatus = computed(() => {
             Object.keys(teams).forEach(group => {
                 const groupStandings = standings.value[group];
                 
-                // Jos on jo tuloksia, käytä 4. sijan pisteitä tai arviota
                 if (groupStandings[0].matches > 0) {
-                    // Laske keskiarvo nykyisistä top 4 pisteistä
                     const top4Points = groupStandings.slice(0, 4).map(t => t.points);
                     const avgTop4 = top4Points.reduce((a, b) => a + b, 0) / 4;
                     
-                    // Estimoi loppupistemäärä (olettaen että ~40% peleistä pelattu)
-                    const totalMatches = 5; // Jokainen joukkue pelaa 5 peliä
+                    const totalMatches = 5;
                     const avgMatchesPlayed = groupStandings.reduce((sum, t) => sum + t.matches, 0) / 6;
                     const progressRatio = avgMatchesPlayed / totalMatches;
                     
                     if (progressRatio > 0.7) {
-                        // Jos >70% peleistä pelattu, käytä 4. sijan nykyistä pistemäärää
                         estimates[group] = groupStandings[3].points;
                     } else {
-                        // Muuten ekstrapoloi
-                        estimates[group] = Math.round(avgTop4 / progressRatio * 0.8); // 80% top4 keskiarvosta
+                        estimates[group] = Math.round(avgTop4 / progressRatio * 0.8);
                     }
                 } else {
-                    // Ei tuloksia, käytä oletusarviota
                     estimates[group] = 7;
                 }
             });
