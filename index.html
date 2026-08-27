@@ -26,10 +26,10 @@
         </div>
         
         <div class="mt-4 md:mt-0 flex items-center bg-gray-100 p-2 rounded-lg">
-            <button @click="mode = 'admin'" 
-                    :class="mode === 'admin' ? 'bg-white shadow-sm font-bold text-red-600' : 'text-gray-500'" 
+            <button @click="mode = 'view'" 
+                    :class="mode === 'view' ? 'bg-white shadow-sm font-bold text-green-600' : 'text-gray-500'" 
                     class="px-4 py-2 rounded-md transition-all text-sm flex items-center gap-2">
-                <i class="fa-solid fa-lock"></i> Kirjaa virallisia
+                <i class="fa-solid fa-eye"></i> Viralliset tulokset
             </button>
             <button @click="mode = 'scenario'" 
                     :class="mode === 'scenario' ? 'bg-white shadow-sm font-bold text-blue-600' : 'text-gray-500'" 
@@ -138,20 +138,17 @@
                                 <div v-if="officialResults[match.id]" class="flex items-center gap-2">
                                     <span class="font-bold bg-gray-200 px-2 py-0.5 rounded">{{ officialResults[match.id].home }} - {{ officialResults[match.id].away }}</span>
                                     <i class="fa-solid fa-lock text-gray-400 text-sm"></i>
-                                    <button v-if="mode === 'admin'" @click="removeResult(match.id, 'official')" class="text-red-400 hover:text-red-600 ml-1"><i class="fa-solid fa-xmark"></i></button>
                                 </div>
                                 <div v-else-if="mode === 'scenario'" class="flex flex-col items-end w-full">
                                     <div v-if="scenarioResults[match.id]" class="flex items-center gap-2 mb-1">
                                         <span class="font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded border border-blue-200 italic">{{ scenarioResults[match.id].home }} - {{ scenarioResults[match.id].away }}</span>
-                                        <button @click="removeResult(match.id, 'scenario')" class="text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark"></i></button>
+                                        <button @click="removeResult(match.id)" class="text-gray-400 hover:text-red-500"><i class="fa-solid fa-xmark"></i></button>
                                     </div>
                                     <div class="flex gap-1 flex-wrap justify-end">
-                                        <button v-for="res in ['3-0', '3-1', '3-2', '2-3', '1-3', '0-3']" :key="res" @click="setResult(match.id, res, 'scenario')" class="px-1.5 py-0.5 text-[11px] border rounded hover:bg-blue-50 hover:border-blue-300 transition-colors">{{ res }}</button>
+                                        <button v-for="res in ['3-0', '3-1', '3-2', '2-3', '1-3', '0-3']" :key="res" @click="setResult(match.id, res)" class="px-1.5 py-0.5 text-[11px] border rounded hover:bg-blue-50 hover:border-blue-300 transition-colors">{{ res }}</button>
                                     </div>
                                 </div>
-                                <div v-else-if="mode === 'admin'" class="flex gap-1 flex-wrap justify-end">
-                                    <button v-for="res in ['3-0', '3-1', '3-2', '2-3', '1-3', '0-3']" :key="res" @click="setResult(match.id, res, 'official')" class="px-1.5 py-0.5 text-[11px] border rounded bg-gray-50 hover:bg-red-50 hover:border-red-300 transition-colors">{{ res }}</button>
-                                </div>
+                                <div v-else class="text-sm text-gray-400 italic">Ei vielä pelattu</div>
                             </div>
                         </div>
                     </div>
@@ -256,7 +253,7 @@ const { createApp, ref, computed, watch, onMounted } = Vue;
 
 createApp({
     setup() {
-        const mode = ref('scenario');
+        const mode = ref('view');
         const activeFilter = ref('Kaikki'); 
         const openGroups = ref({ A: false, B: false, C: true, D: false });
         const toggleGroup = (group) => openGroups.value[group] = !openGroups.value[group];
@@ -309,36 +306,55 @@ createApp({
         const scenarioResults = ref({});
         const knockout = ref({}); 
 
-        onMounted(() => {
-            const savedOfficial = localStorage.getItem('ev26_official');
-            const savedScenario = localStorage.getItem('ev26_scenario');
-            const savedKo = localStorage.getItem('ev26_ko_v2'); 
+        // Lataa viralliset tulokset results.json -tiedostosta
+        const loadOfficialResults = async () => {
+            try {
+                const response = await fetch('results.json?' + new Date().getTime()); // Cache-busting
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('✅ Viralliset tulokset ladattu results.json -tiedostosta');
+                    return data;
+                }
+            } catch (err) {
+                console.log('ℹ️ results.json ei löytynyt, käytetään paikallista dataa');
+            }
+            return {};
+        };
+
+        onMounted(async () => {
+            // Lataa viralliset tulokset GitHubista
+            const loadedResults = await loadOfficialResults();
+            if (Object.keys(loadedResults).length > 0) {
+                officialResults.value = loadedResults;
+            }
             
-            if (savedOfficial) officialResults.value = JSON.parse(savedOfficial);
+            // Lataa skenaariot ja knockout-tila localStorage:sta (käyttäjäkohtaiset)
+            const savedScenario = localStorage.getItem('ev26_scenario');
+            const savedKo = localStorage.getItem('ev26_ko_v2');
+            
             if (savedScenario) scenarioResults.value = JSON.parse(savedScenario);
             if (savedKo) knockout.value = JSON.parse(savedKo);
         });
 
-        watch(officialResults, (newVal) => localStorage.setItem('ev26_official', JSON.stringify(newVal)), { deep: true });
+        // Tallenna vain skenaariot ja knockout-tila localStorage:iin
         watch(scenarioResults, (newVal) => localStorage.setItem('ev26_scenario', JSON.stringify(newVal)), { deep: true });
         watch(knockout, (newVal) => localStorage.setItem('ev26_ko_v2', JSON.stringify(newVal)), { deep: true });
 
-        const setResult = (matchId, resultString, target) => {
+        const setResult = (matchId, resultString) => {
             const [h, a] = resultString.split('-').map(Number);
-            if (target === 'official') {
-                officialResults.value[matchId] = { home: h, away: a };
-                delete scenarioResults.value[matchId];
-            } else {
-                scenarioResults.value[matchId] = { home: h, away: a };
+            scenarioResults.value[matchId] = { home: h, away: a };
+        };
+
+        const removeResult = (matchId) => {
+            delete scenarioResults.value[matchId];
+        };
+
+        const clearScenarios = () => { 
+            if(confirm('Haluatko varmasti tyhjentää kaikki skenaariot?')) {
+                scenarioResults.value = {};
             }
         };
-
-        const removeResult = (matchId, target) => {
-            if (target === 'official') delete officialResults.value[matchId];
-            else delete scenarioResults.value[matchId];
-        };
-
-        const clearScenarios = () => { if(confirm('Haluatko varmasti tyhjentää kaikki skenaariot?')) scenarioResults.value = {}; };
+        
         const clearKnockout = () => { knockout.value = {}; };
 
         const getMatchStyle = (matchId) => {
