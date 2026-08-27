@@ -534,38 +534,46 @@ createApp({
             return maxP;
         });
 
-        // Tarkista joukkueiden matemaattinen jatkopaikka/putoaminen
-        const teamQualificationStatus = computed(() => {
-            let status = { A: {}, B: {}, C: {}, D: {} };
+       // Tarkista joukkueiden matemaattinen jatkopaikka/putoaminen
+const teamQualificationStatus = computed(() => {
+    let status = { A: {}, B: {}, C: {}, D: {} };
+    
+    Object.keys(teams).forEach(group => {
+        const groupStandings = standings.value[group];
+        const maxPointsInGroup = maxPoints.value[group];
+        
+        teams[group].forEach((team) => {
+            const teamStats = groupStandings.find(t => t.name === team);
+            const teamMaxPoints = maxPointsInGroup[team];
+            const teamCurrentPoints = teamStats.points;
             
-            Object.keys(teams).forEach(group => {
-                const groupStandings = standings.value[group];
-                const maxPointsInGroup = maxPoints.value[group];
-                
-                teams[group].forEach((team, idx) => {
-                    const teamMaxPoints = maxPointsInGroup[team];
-                    
-                    // Tarkista onko varma jatkopaikka (top 4)
-                    // Jos joukkueen maksimipistemäärä on suurempi kuin vähintään kahden muun joukkueen maksimi
-                    const sortedByMax = Object.entries(maxPointsInGroup)
-                        .filter(([t]) => t !== team)
-                        .sort((a, b) => b[1] - a[1]);
-                    
-                    // Jos joukkueen nykyiset pisteet ovat suuremmat kuin 5. ja 6. sijoilla olevien maksimipisteet
-                    const teamCurrentPoints = groupStandings.find(t => t.name === team).points;
-                    const fifthPlaceMaxPoints = sortedByMax[4] ? sortedByMax[4][1] : 0;
-                    
-                    if (teamCurrentPoints > fifthPlaceMaxPoints) {
-                        status[group][team] = 'qualified';
-                    }
-                    // Tarkista onko varma putoaminen
-                    else if (sortedByMax.length >= 4) {
-                        const fourthPlaceMaxPoints = sortedByMax[3][1];
-                        if (teamMaxPoints < fourthPlaceMaxPoints) {
-                            status[group][team] = 'eliminated';
-                        }
-                    }
-                });
+            // ELIMINATED: Laske montako joukkuetta on JO ohittanut tämän joukkueen maksimipistemäärän
+            const teamsAlreadyAboveMax = groupStandings.filter(t => 
+                t.name !== team && t.points > teamMaxPoints
+            ).length;
+            
+            // Jos 4 tai enemmän joukkuetta on jo ohittanut maksimipistemäärän → eliminoitu
+            if (teamsAlreadyAboveMax >= 4) {
+                status[group][team] = 'eliminated';
+                return; // Ei tarvitse tarkistaa qualified-statusta
+            }
+            
+            // QUALIFIED: Laske montako joukkuetta VOI VIELÄ ohittaa tämän joukkueen nykyiset pisteet
+            const otherTeams = groupStandings.filter(t => t.name !== team);
+            const teamsCanStillCatchUp = otherTeams.filter(t => 
+                maxPointsInGroup[t.name] > teamCurrentPoints
+            ).length;
+            
+            // Jos korkeintaan 1 joukkue voi ohittaa → qualified (varmuudella top 4)
+            if (teamsCanStillCatchUp <= 1) {
+                status[group][team] = 'qualified';
+            }
+        });
+    });
+    
+    return status;
+});
+
             });
             
             return status;
